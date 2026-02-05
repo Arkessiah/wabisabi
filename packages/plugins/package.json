@@ -1,0 +1,16 @@
+{
+  "name": "@wabisabi/plugins",
+  "version": "1.0.0",
+  "description": "Plugin system for WabiSabi - Compatible with Claude Code and OpenCode",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "bun build src/index.ts --outfile dist/index.js --target bun",
+    "test": "bun test"
+  },
+  "keywords": [
+    "plugins",
+    "extensibility",
+    "wabisabi"
+  ]
+}

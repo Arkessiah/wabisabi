@@ -1,0 +1,18 @@
+{
+  "name": "@wabisabi/auth",
+  "version": "1.0.0",
+  "description": "Authentication system for WabiSabi - OAuth + Token management",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "bun build src/index.ts --outfile dist/index.js --target bun",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "openid-client": "^5.6.0",
+    "jsonwebtoken": "^9.0.0",
+    "bcryptjs": "^2.4.0"
+  },
+  "devDependencies": {
+    "bun-types": "^1.0.0"
+  }
+}

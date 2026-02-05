@@ -1,0 +1,26 @@
+{
+  "name": "wabisabi",
+  "version": "1.0.0",
+  "description": "Terminal IDE with agents - AI coding tool",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "wabisabi-web-next"
+  ],
+  "scripts": {
+    "build": "bun run build:terminal",
+    "build:terminal": "cd packages/terminal && bun build",
+    "dev": "cd packages/terminal && bun dev",
+    "test": "bun test",
+    "lint": "eslint ."
+  },
+  "keywords": [
+    "ai",
+    "coding",
+    "terminal",
+    "agents",
+    "llm"
+  ],
+  "author": "",
+  "license": "MIT"
+}

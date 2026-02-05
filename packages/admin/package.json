@@ -1,0 +1,10 @@
+{
+  "name": "@wabisabi/admin",
+  "version": "1.0.0",
+  "description": "Admin tools for WabiSabi",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "bun build src/index.ts --outfile dist/index.js --target bun",
+    "test": "bun test"
+  }
+}
