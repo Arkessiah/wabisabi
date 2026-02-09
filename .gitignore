@@ -142,4 +142,15 @@ vite.config.ts.timestamp-*
 .DS_Store
 BASE/
 
+# Documentation (local planning files - never commit)
+*.md
+!README.md
+AGENTS.md
+PLAN.md
+TODO.md
+*.md.bak
+
+# Local services files
+packages/terminal/src/services/
+
 
