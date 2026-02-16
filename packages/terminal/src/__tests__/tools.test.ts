@@ -6,6 +6,7 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
+import { execSync } from "child_process";
 import { configManager } from "../config/index.js";
 
 // Import tools directly
@@ -39,6 +40,11 @@ beforeAll(() => {
     join(TEST_DIR, "src", "index.ts"),
     'export const x = 1;\nexport const y = 2;\n',
   );
+
+  // Initialize git repo for git tool tests
+  execSync("git init", { cwd: TEST_DIR, stdio: "ignore" });
+  execSync("git config user.email 'test@test.com'", { cwd: TEST_DIR, stdio: "ignore" });
+  execSync("git config user.name 'Test'", { cwd: TEST_DIR, stdio: "ignore" });
 });
 
 afterAll(() => {
@@ -204,5 +210,43 @@ describe("git tool", () => {
     );
     expect(result.output).toContain("branch");
     expect(result.metadata.error).toBe(true);
+  });
+
+  test("merge requires branch", async () => {
+    const result = await gitTool.execute(
+      { subcommand: "merge" },
+      ctx,
+    );
+    expect(result.output).toContain("branch");
+    expect(result.metadata.error).toBe(true);
+  });
+
+  test("cherry-pick requires commit", async () => {
+    const result = await gitTool.execute(
+      { subcommand: "cherry-pick" },
+      ctx,
+    );
+    expect(result.output).toContain("commit");
+    expect(result.metadata.error).toBe(true);
+  });
+
+  test("status runs in git repo", async () => {
+    const result = await gitTool.execute(
+      { subcommand: "status" },
+      ctx,
+    );
+    expect(result.metadata.error).toBeFalsy();
+  });
+
+  test("validates .git exists", async () => {
+    const noGitDir = join(tmpdir(), `no-git-${Date.now()}`);
+    mkdirSync(noGitDir, { recursive: true });
+    const result = await gitTool.execute(
+      { subcommand: "status" },
+      { projectRoot: noGitDir },
+    );
+    expect(result.output).toContain("No .git directory");
+    expect(result.metadata.error).toBe(true);
+    rmSync(noGitDir, { recursive: true, force: true });
   });
 });

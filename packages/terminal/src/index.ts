@@ -264,16 +264,119 @@ program
   );
 
 // ═══════════════════════════════════════════════════════════════
-// PLUGIN COMMANDS (planned - not yet functional)
+// WATCH MODE
+// ═══════════════════════════════════════════════════════════════
+
+program
+  .command("watch")
+  .alias("w")
+  .description("👁️ Watch files and run commands on change")
+  .option("--command <cmd>", "Command to run on file change")
+  .option("--prompt <text>", "LLM prompt on file change (use {file} placeholder)")
+  .option("--ignore <dirs>", "Comma-separated directories to ignore")
+  .action(async (cmdOpts: { command?: string; prompt?: string; ignore?: string }) => {
+    const opts = program.opts() as CLIOptions;
+    await import("./modes/watch.js").then((m) =>
+      m.watchMode(opts, {
+        command: cmdOpts.command,
+        onChangePrompt: cmdOpts.prompt,
+        ignore: cmdOpts.ignore?.split(",").map((s) => s.trim()),
+      }),
+    );
+  });
+
+// ═══════════════════════════════════════════════════════════════
+// WEB UI
+// ═══════════════════════════════════════════════════════════════
+
+program
+  .command("web")
+  .description("🌐 Start web-based terminal UI (xterm.js)")
+  .option("--port <number>", "HTTP/WS port", "3333")
+  .action(async (cmdOpts: { port?: string }) => {
+    const opts = program.opts() as CLIOptions;
+    const port = parseInt(cmdOpts.port || "3333", 10);
+    await import("./modes/web.js").then((m) => m.webMode(opts, port));
+  });
+
+// ═══════════════════════════════════════════════════════════════
+// MULTI-AGENT
+// ═══════════════════════════════════════════════════════════════
+
+program
+  .command("collab <request>")
+  .description("🤝 Multi-agent collaboration on a complex task")
+  .action(async (request: string) => {
+    const opts = program.opts() as CLIOptions;
+    const { AgentCoordinator } = await import("./agents/coordinator.js");
+    const { projectContext } = await import("./context/index.js");
+    await projectContext.initialize();
+    const coordinator = new AgentCoordinator(opts);
+    const plan = await coordinator.createPlan(request);
+    await coordinator.execute(plan);
+  });
+
+// ═══════════════════════════════════════════════════════════════
+// PLUGIN COMMANDS
 // ═══════════════════════════════════════════════════════════════
 
 program
   .command("plugin")
-  .description("🔌 Manage plugins (coming soon)")
-  .action(() => {
-    console.log("\n🔌 Plugin system is planned for a future release.");
-    console.log("   Plugin types: tool, agent, theme, integration");
-    console.log("   Sources: GitHub, npm, local, URL\n");
+  .description("🔌 Manage plugins")
+  .option("--list", "List installed plugins")
+  .option("--install <path>", "Install plugin from local path")
+  .option("--enable <name>", "Enable a plugin")
+  .option("--disable <name>", "Disable a plugin")
+  .option("--remove <name>", "Remove a plugin")
+  .action(async (options: { list?: boolean; install?: string; enable?: string; disable?: string; remove?: string }) => {
+    const { pluginManager } = await import("./services/plugin-manager.js");
+    await pluginManager.loadAll();
+
+    if (options.install) {
+      try {
+        const info = await pluginManager.install({ type: "local", path: options.install });
+        console.log(`🔌 Installed: ${info.manifest.name} v${info.manifest.version}`);
+      } catch (err) {
+        console.error(`❌ Install failed: ${err instanceof Error ? err.message : err}`);
+      }
+      return;
+    }
+
+    if (options.enable) {
+      pluginManager.enable(options.enable);
+      console.log(`✓ Enabled: ${options.enable}`);
+      return;
+    }
+
+    if (options.disable) {
+      pluginManager.disable(options.disable);
+      console.log(`✓ Disabled: ${options.disable}`);
+      return;
+    }
+
+    if (options.remove) {
+      try {
+        await pluginManager.remove(options.remove);
+        console.log(`🗑️ Removed: ${options.remove}`);
+      } catch (err) {
+        console.error(`❌ ${err instanceof Error ? err.message : err}`);
+      }
+      return;
+    }
+
+    // Default: list
+    const plugins = pluginManager.list();
+    if (plugins.length === 0) {
+      console.log("\n🔌 No plugins installed.");
+      console.log("   Install: wabisabi plugin --install <path>");
+    } else {
+      console.log("\n🔌 Installed Plugins");
+      console.log("═".repeat(40));
+      for (const p of plugins) {
+        const status = p.enabled ? "✓" : "✗";
+        console.log(`  ${status} ${p.manifest.name.padEnd(20)} v${p.manifest.version} (${p.manifest.type})`);
+      }
+    }
   });
 
 // ═══════════════════════════════════════════════════════════════

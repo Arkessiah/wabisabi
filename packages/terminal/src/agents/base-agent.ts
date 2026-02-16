@@ -45,6 +45,8 @@ import {
   ramManager,
   classifyComplexity,
 } from "../ram/index.js";
+import { isFirstRun, runOnboarding } from "../onboarding.js";
+import { renderMarkdown, hasMarkdown } from "../rendering/index.js";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
@@ -53,6 +55,21 @@ import chalk from "chalk";
 // Tools that modify files - auto-log to PLAN.md
 const MUTATING_TOOLS = new Set(["write", "edit", "bash"]);
 const MAX_TOOL_ITERATIONS = 25; // Safety limit for tool-calling loop
+
+// ── Slash Command Completion ─────────────────────────────────────
+
+const SLASH_COMMANDS = [
+  "/help", "/clear", "/model", "/status", "/tools", "/approve",
+  "/compact", "/export", "/menu", "/session", "/sessions",
+  "/soul", "/ram", "/pin", "/pins", "/unpin", "/device",
+  "/hat", "/profile", "/style", "/reset",
+];
+
+function slashCompleter(line: string): [string[], string] {
+  if (!line.startsWith("/")) return [[], line];
+  const hits = SLASH_COMMANDS.filter((c) => c.startsWith(line));
+  return [hits.length ? hits : SLASH_COMMANDS, line];
+}
 
 // ── Input History ──────────────────────────────────────────────
 
@@ -363,7 +380,7 @@ export abstract class BaseAgent {
           menuSystem.setCategory(category);
         }
         menuSystem.open();
-        console.log("\n" + menuSystem.renderToText() + "\n");
+        await this.runInteractiveMenu();
         menuSystem.close();
         return true;
       }
@@ -637,6 +654,106 @@ export abstract class BaseAgent {
   }
 
   /**
+   * Interactive menu with keyboard navigation.
+   * Uses raw mode to capture arrow keys, enter, space, esc.
+   */
+  private async runInteractiveMenu(): Promise<void> {
+    const categories: import("../services/menu-system.js").MenuCategory[] = [
+      "models", "skills", "plugins", "privacy", "settings",
+    ];
+
+    return new Promise<void>((resolve) => {
+      const render = () => {
+        // Clear previous render and redraw
+        process.stdout.write("\x1B[2J\x1B[H"); // clear screen
+        console.log(menuSystem.renderToText());
+        console.log(chalk.dim("\n  [Arrow keys] Navigate  [Enter] Select  [Space] Toggle  [Tab] Category  [Esc/q] Close"));
+      };
+
+      render();
+
+      const stdin = process.stdin;
+      const wasRaw = stdin.isRaw;
+      if (stdin.isTTY) stdin.setRawMode(true);
+      stdin.resume();
+
+      const onKey = (key: Buffer) => {
+        const s = key.toString();
+        // Esc or q - close
+        if (s === "\x1B" || s === "q") {
+          cleanup();
+          return;
+        }
+        // Ctrl+C
+        if (s === "\x03") {
+          cleanup();
+          return;
+        }
+        // Enter - select
+        if (s === "\r" || s === "\n") {
+          menuSystem.select();
+          render();
+          return;
+        }
+        // Space - toggle
+        if (s === " ") {
+          menuSystem.toggle();
+          render();
+          return;
+        }
+        // Tab - cycle category
+        if (s === "\t") {
+          const state = menuSystem.getState();
+          const idx = categories.indexOf(state.category);
+          const next = categories[(idx + 1) % categories.length];
+          menuSystem.setCategory(next);
+          render();
+          return;
+        }
+        // Arrow keys (escape sequences)
+        if (s === "\x1B[A") { // Up
+          menuSystem.moveUp();
+          render();
+          return;
+        }
+        if (s === "\x1B[B") { // Down
+          menuSystem.moveDown();
+          render();
+          return;
+        }
+        if (s === "\x1B[C") { // Right - next category
+          const state = menuSystem.getState();
+          const idx = categories.indexOf(state.category);
+          if (idx < categories.length - 1) {
+            menuSystem.setCategory(categories[idx + 1]);
+            render();
+          }
+          return;
+        }
+        if (s === "\x1B[D") { // Left - prev category
+          const state = menuSystem.getState();
+          const idx = categories.indexOf(state.category);
+          if (idx > 0) {
+            menuSystem.setCategory(categories[idx - 1]);
+            render();
+          }
+          return;
+        }
+      };
+
+      const cleanup = () => {
+        stdin.removeListener("data", onKey);
+        if (stdin.isTTY) stdin.setRawMode(wasRaw ?? false);
+        // Clear menu and restore prompt
+        process.stdout.write("\x1B[2J\x1B[H");
+        resolve();
+      };
+
+      stdin.on("data", onKey);
+    });
+  }
+
+  /**
    * Execute one tool call and return the result.
    */
   private async executeToolCall(
@@ -758,7 +875,11 @@ export abstract class BaseAgent {
         return { content: "", tool_calls: [], finish_reason: "error" };
       }
       if (msg.content) {
-        process.stdout.write("\n" + msg.content);
+        // Non-streaming fallback: render markdown
+        const rendered = hasMarkdown(msg.content)
+          ? renderMarkdown(msg.content)
+          : msg.content;
+        process.stdout.write("\n" + rendered);
       }
       return {
         content: msg.content || "",
@@ -859,6 +980,11 @@ export abstract class BaseAgent {
   }
 
   async run(resumeSessionId?: string): Promise<void> {
+    // Onboarding on first run
+    if (isFirstRun()) {
+      await runOnboarding(this.opts.substratum, this.opts.ollama);
+    }
+
     console.log(this.getHeader());
 
     // Detect provider
@@ -960,7 +1086,7 @@ export abstract class BaseAgent {
       this.conversationHistory = [systemMessage];
     }
 
-    // REPL loop with persistent history
+    // REPL loop with persistent history + tab completion
     const readline = await import("readline");
     const history = loadHistory();
     const rl = readline.createInterface({
@@ -968,6 +1094,7 @@ export abstract class BaseAgent {
       output: process.stdout,
       history: history,
       historySize: MAX_HISTORY,
+      completer: slashCompleter,
     });
     this.rl = rl;
 
