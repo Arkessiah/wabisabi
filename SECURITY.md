@@ -114,10 +114,10 @@ El agente avisara al usuario cada lunes con:
 
 ### Hallazgos Críticos (Acción Inmediata Requerida)
 
-1. **@wabisabi/plugins** - Arbitrary code execution via `import(pluginPath)` sin validación
-   - **Riesgo**: Código malicioso puede ejecutarse con privilegios completos
-   - **Acción**: NO USAR sistema de plugins hasta implementar sandboxing
-   - **Estado**: ❌ PENDIENTE
+1. ✅ **@wabisabi/plugins** - Arbitrary code execution via `import(pluginPath)` sin sandboxing
+   - **Riesgo**: Código malicioso ejecutado con privilegios completos
+   - **Acción**: Bun Worker sandboxing + permission enforcement
+   - **Estado**: ✅ RESUELTO (2026-02-16)
 
 2. ✅ **@wabisabi/auth** - Session tokens con weak encryption key derivation
    - **Riesgo**: Encryption keys predecibles por machine-id, atomic writes faltantes
@@ -126,7 +126,7 @@ El agente avisara al usuario cada lunes con:
 
 ### Top 5 Prioridades de Fix
 
-1. **Plugin sandboxing** (packages/plugins) - Path validation, integrity checks, Workers - ❌ PENDIENTE
+1. ✅ **Plugin sandboxing** (packages/plugins) - Bun Workers + permission enforcement - RESUELTO
 2. ✅ **Auth encryption** (packages/auth) - OS keychain + atomic writes - RESUELTO
 3. **Web server hardening** (packages/terminal) - Bind 127.0.0.1, auth token, Origin validation - ⚠️ PENDIENTE
 4. ✅ **File tool containment** (packages/terminal) - Validar paths dentro de projectRoot - RESUELTO
@@ -139,5 +139,5 @@ El agente avisara al usuario cada lunes con:
 ### Estadísticas
 
 - **Archivos auditados**: 20+ archivos de código crítico
-- **Severidad**: 2 CRITICAS, 5 ALTAS, 5 MEDIAS, 7 BAJAS
-- **Frameworks OWASP**: A01 (Access Control), A02 (Crypto), A03 (Injection), A07 (Auth), A08 (Integrity)
+- **Severidad RESUELTAS**: 2/2 CRITICAS ✅, 1/5 ALTAS, 5/5 MEDIAS ✅, 5/5 BAJAS ✅
+- **Frameworks OWASP**: A01 (Access Control) ✅, A02 (Crypto) ✅, A03 (Injection) ✅, A07 (Auth), A08 (Integrity) ✅

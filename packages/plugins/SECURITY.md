@@ -15,22 +15,37 @@ Sin dependencias externas. El riesgo principal es el codigo de los plugins carga
 **Severidad global: CRITICA** - 1 CRITICA detectada
 
 #### CRITICA-1: Arbitrary Code Execution via plugin loading ✅ FIXED
-- **Archivo**: `src/index.ts:66-141`
-- **Issue**: `await import(pluginPath)` sin validación de path, integridad o sandboxing
-- **OWASP**: A08:2021 Software and Data Integrity Failures
-- **Fix aplicado (2026-02-16)**:
+- **Archivo**: `src/index.ts`, `src/worker.ts`, `src/sandbox.ts`
+- **Issue**: `await import(pluginPath)` ejecutaba plugins con privilegios completos sin aislamiento
+- **OWASP**: A01:2021 Broken Access Control, A03:2021 Injection, A08:2021 Software and Data Integrity Failures
+- **Fix aplicado (2026-02-16 - Fase 2 con Bun Worker Sandboxing)**:
+
+  **Validaciones (Fase 1)**:
   - ✅ Path validation: `validatePluginPath()` rechaza URLs remotas y valida contra allowlist
   - ✅ Allowlist: Solo `~/.wabisabi/plugins/` y `.wabisabi/plugins/` permitidos
   - ✅ Manifest validation: `PluginManifestSchema` (Zod) valida ANTES de import()
   - ✅ Checksum SHA-256: Verificación de integridad con `verifyChecksum()` antes de importar
   - ✅ Name/version matching: Valida que plugin export coincida con manifest
-  - ✅ 8 tests completos verifican todas las validaciones de seguridad
-  - ✅ Security pipeline: validatePath → readManifest → validateSchema → verifyChecksum → import()
+
+  **Sandboxing (Fase 2 - NEW)**:
+  - ✅ **Bun Worker isolation**: Plugins ejecutan en Worker process separado
+  - ✅ **Permission enforcement**: network, filesystem, process controls
+  - ✅ **Static code analysis**: Detecta eval(), Function(), process manipulation
+  - ✅ **Restricted PluginContext**: Sin acceso a global config, logs via postMessage
+  - ✅ **Worker timeouts**: 10s load, 5s unload, auto-termination
+  - ✅ **No shared state**: Aislamiento completo entre plugins y main process
+
 - **Archivos creados**:
   - `src/schemas.ts`: Zod schemas para manifest y tool inputs
   - `src/security.ts`: Path validation, checksum computation/verification
-  - `src/__tests__/plugin-security.test.ts`: 8 tests de seguridad (todos pasando)
-- **Estado**: **RESUELTO** - Sistema de plugins seguro para uso en producción
+  - `src/sandbox.ts`: createSandboxContext(), validatePluginCode(), permission enforcement
+  - `src/worker.ts`: Worker runtime, message handling, plugin execution
+  - `src/__tests__/plugin-security.test.ts`: 7 tests de validations
+  - `src/__tests__/sandbox-enforcement.test.ts`: 8 tests de sandboxing (NEW)
+
+- **Tests**: 15 tests (0 failures) - network/filesystem/process blocking, eval detection, worker isolation
+
+- **Estado**: **RESUELTO** - Sistema de plugins con sandboxing completo, listo para producción
 
 ## Areas Criticas
 
@@ -83,4 +98,5 @@ Sin dependencias externas. El riesgo principal es el codigo de los plugins carga
 | Fecha | Revisor | Hallazgos | Acciones |
 |-------|---------|-----------|----------|
 | 2026-02-16 | Agente | Audit inicial | 1 CRITICA detectada |
-| 2026-02-16 | Agente | CRITICA-1 Fixed | Plugin sandboxing implementado |
+| 2026-02-16 | Agente | CRITICA-1 Fixed Fase 1 | Validaciones (path, manifest, checksum) |
+| 2026-02-16 | Agente | CRITICA-1 Fixed Fase 2 | Bun Worker sandboxing + permission enforcement completo |
