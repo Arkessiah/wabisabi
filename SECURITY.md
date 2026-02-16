@@ -14,7 +14,7 @@ The following versions are currently supported with security updates:
 
 We take security seriously.
 
-If you discover a security vulnerability, please report it privately using GitHub’s **Private Vulnerability Reporting** feature:
+If you discover a security vulnerability, please report it privately using GitHub's **Private Vulnerability Reporting** feature:
 
 1. Go to the repository.
 2. Click on the **Security** tab.
@@ -28,118 +28,121 @@ Please do not open a public issue for security vulnerabilities.
 - Description of the vulnerability
 - Steps to reproduce
 - Impact assessment
-- Suggested mitigation (if available)
+- Suggested fix (if any)
+- Your contact information
 
-### Response timeline
+### What to expect
 
-- Initial acknowledgment: within 72 hours
-- Status update: within 7 days
-- Patch or mitigation timeline: depending on severity
-
-If the report is accepted, we will:
-- Prepare a fix
-- Publish a security advisory
-- Credit the reporter (if desired)
-
-We appreciate responsible disclosure.
+- **Initial Response**: Within 48 hours
+- **Status Updates**: Every 72 hours
+- **Fix Timeline**: Critical issues within 7 days, high priority within 14 days
+- **Public Disclosure**: After fix is deployed (coordinated disclosure)
 
 ---
 
-## Security por Paquete
+## Package-Specific Security
 
-Cada paquete mantiene su propio SECURITY.md con detecciones especificas:
+Each package maintains its own SECURITY.md with specific detections:
 
-| Paquete | Riesgo | Dependencias | SECURITY.md |
-|---------|--------|-------------|-------------|
-| @wabisabi/terminal | Alto | ws, zod, chalk, commander | [packages/terminal/SECURITY.md](packages/terminal/SECURITY.md) |
-| @wabisabi/auth | Alto | openid-client, jsonwebtoken, bcryptjs | [packages/auth/SECURITY.md](packages/auth/SECURITY.md) |
-| @wabisabi/plugins | Medio | Ninguna (riesgo en plugins de terceros) | [packages/plugins/SECURITY.md](packages/plugins/SECURITY.md) |
-| @wabisabi/admin | Bajo | Ninguna | [packages/admin/SECURITY.md](packages/admin/SECURITY.md) |
+| Package | Risk | Dependencies | SECURITY.md |
+|---------|------|-------------|-------------|
+| @wabisabi/terminal | High | ws, zod, chalk, commander | [packages/terminal/SECURITY.md](packages/terminal/SECURITY.md) |
+| @wabisabi/auth | High | openid-client, jsonwebtoken, bcryptjs | [packages/auth/SECURITY.md](packages/auth/SECURITY.md) |
+| @wabisabi/plugins | Medium | None (risk in third-party plugins) | [packages/plugins/SECURITY.md](packages/plugins/SECURITY.md) |
+| @wabisabi/admin | Low | None | [packages/admin/SECURITY.md](packages/admin/SECURITY.md) |
+
+---
 
 ## Dependabot
 
-GitHub Dependabot debe estar activado para este repositorio:
+GitHub Dependabot must be enabled for this repository:
 
-1. **Settings > Code security and analysis > Dependabot alerts**: Activar
-2. **Dependabot security updates**: Activar
-3. **Dependabot version updates**: Configurar en `.github/dependabot.yml`
+1. **Settings > Code security and analysis > Dependabot alerts**: Enable
+2. **Dependabot security updates**: Enable
+3. **Dependabot version updates**: Configure in `.github/dependabot.yml`
 
-Las alertas de Dependabot se documentan en el SECURITY.md de cada paquete afectado.
+Dependabot alerts are documented in each affected package's SECURITY.md.
 
-## Plan de Revision Semanal de Seguridad
+---
 
-### Frecuencia: Cada lunes
+## Weekly Security Review Plan
 
-El agente de seguridad de WabiSabi ejecutara automaticamente una revision semanal que incluye:
+### Frequency: Every Monday
 
-### 1. Dependencias y CVEs
-- Revisar alertas de Dependabot en GitHub Security tab
-- Ejecutar `bun audit` / `npm audit` en cada paquete
-- Verificar versiones actuales vs ultimas estables
-- Merge PRs de Dependabot que pasen tests (patch/minor)
-- Evaluar major updates con breaking changes
+The WabiSabi security agent will automatically run a weekly review that includes:
 
-### 2. Codigo
-- Scan de secretos expuestos (API keys, tokens, passwords)
-- Revision de nuevos archivos por vulnerabilidades comunes
-- Verificar permisos de archivos sensibles (auth, config)
-- Comprobar sanitizacion de inputs en tools y endpoints
+### 1. Dependencies and CVEs
+- Review Dependabot alerts in GitHub Security tab
+- Run `bun audit` / `npm audit` on each package
+- Check current versions vs latest stable
+- Merge Dependabot PRs that pass tests (patch/minor)
+- Evaluate major updates with breaking changes
 
-### 3. Infraestructura
-- Verificar que el servidor web solo escucha en localhost
-- Comprobar cifrado de credenciales at-rest
-- Revisar logs de acceso si disponibles
-- Verificar integridad de plugins instalados
+### 2. Code
+- Scan for exposed secrets (API keys, tokens, passwords)
+- Review new files for common vulnerabilities
+- Check permissions on sensitive files (auth, config)
+- Verify input sanitization in tools and endpoints
 
-### 4. Documentacion
-- Actualizar SECURITY.md de cada paquete con hallazgos
-- Registrar acciones tomadas en historial de revisiones
-- Notificar al usuario de issues pendientes
+### 3. Infrastructure
+- Verify web server only listens on localhost
+- Check credential encryption at rest
+- Review access logs if available
+- Verify integrity of installed plugins
 
-### Notificaciones
+### 4. Documentation
+- Update each package's SECURITY.md with findings
+- Record actions taken in review history
+- Notify user of pending issues
 
-El agente avisara al usuario cada lunes con:
-- Resumen de alertas de Dependabot activas
-- Dependencias desactualizadas
-- Vulnerabilidades detectadas en codigo
-- Acciones recomendadas priorizadas por severidad
+### Notifications
 
-## Historial de Revisiones Globales
+The agent will notify the user every Monday with:
+- Summary of active Dependabot alerts
+- Outdated dependencies
+- Vulnerabilities detected in code
+- Recommended actions prioritized by severity
 
-| Fecha | Paquetes revisados | Hallazgos | Acciones |
-|-------|-------------------|-----------|----------|
-| 2026-02-16 | Todos (terminal, auth, plugins, admin) | **2 CRITICAS**, 5 ALTAS, 5 MEDIAS, 7 BAJAS | Ver SECURITY.md de cada paquete para detalles |
+---
 
-## Resumen Ejecutivo del Audit Inicial (2026-02-16)
+## Global Review History
 
-### Hallazgos Críticos (Acción Inmediata Requerida)
+| Date | Packages Reviewed | Findings | Actions |
+|------|-------------------|----------|---------|
+| 2026-02-16 | All (terminal, auth, plugins, admin) | **2 CRITICAL**, 5 HIGH, 5 MEDIUM, 7 LOW | See each package's SECURITY.md for details |
 
-1. ✅ **@wabisabi/plugins** - Arbitrary code execution via `import(pluginPath)` sin sandboxing
-   - **Riesgo**: Código malicioso ejecutado con privilegios completos
-   - **Acción**: Bun Worker sandboxing + permission enforcement
-   - **Estado**: ✅ RESUELTO (2026-02-16)
+---
 
-2. ✅ **@wabisabi/auth** - Session tokens con weak encryption key derivation
-   - **Riesgo**: Encryption keys predecibles por machine-id, atomic writes faltantes
-   - **Acción**: OS keychain integration + atomic writes
-   - **Estado**: ✅ RESUELTO (2026-02-16)
+## Initial Audit Executive Summary (2026-02-16)
 
-### Top 7 Prioridades de Fix (CRITICAS + ALTAS)
+### Critical Findings (Immediate Action Required)
 
-1. ✅ **Plugin sandboxing** (packages/plugins) - Bun Workers + permission enforcement - RESUELTO (CRITICA-2)
-2. ✅ **Auth encryption** (packages/auth + terminal) - OS keychain + atomic writes - RESUELTO (CRITICA-1)
-3. ✅ **Web server hardening** (packages/terminal) - Localhost binding, token auth, Origin validation, API key via env - RESUELTO (ALTA-3, 2026-02-16)
-4. ✅ **Bash execution restrictions** (packages/terminal) - Env allowlist, command blocklist, destructive operation blocking - RESUELTO (ALTA-4)
-5. ✅ **Encryption key derivation** (packages/terminal/auth) - OS keychain with PBKDF2 fallback - RESUELTO (ALTA-5)
-6. ✅ **File tool containment** (packages/terminal) - Path validation dentro de projectRoot - RESUELTO (MEDIA)
-7. ✅ **Grep shell injection** (packages/terminal) - execFileSync en vez de execSync - RESUELTO (MEDIA)
+1. ✅ **@wabisabi/plugins** - Arbitrary code execution via `import(pluginPath)` without sandboxing
+   - **Risk**: Malicious code executed with full privileges
+   - **Action**: Bun Worker sandboxing + permission enforcement
+   - **Status**: ✅ RESOLVED (2026-02-16)
 
-### Dependencias con CVEs
+2. ✅ **@wabisabi/auth** - Session tokens with weak encryption key derivation
+   - **Risk**: Predictable encryption keys via machine-id, missing atomic writes
+   - **Action**: OS keychain integration + atomic writes
+   - **Status**: ✅ RESOLVED (2026-02-16)
 
-- **ws ^8.16.0** (terminal) - CVE-2024-37890 (DoS) → Actualizar a >=8.17.1
+### Top 7 Fix Priorities (CRITICAL + HIGH)
 
-### Estadísticas
+1. ✅ **Plugin sandboxing** (packages/plugins) - Bun Workers + permission enforcement - RESOLVED (CRITICAL-2)
+2. ✅ **Auth encryption** (packages/auth + terminal) - OS keychain + atomic writes - RESOLVED (CRITICAL-1)
+3. ✅ **Web server hardening** (packages/terminal) - Localhost binding, token auth, Origin validation, API key via env - RESOLVED (HIGH-3, 2026-02-16)
+4. ✅ **Bash execution restrictions** (packages/terminal) - Env allowlist, command blocklist, destructive operation blocking - RESOLVED (HIGH-4)
+5. ✅ **Encryption key derivation** (packages/terminal/auth) - OS keychain with PBKDF2 fallback - RESOLVED (HIGH-5)
+6. ✅ **File tool containment** (packages/terminal) - Path validation within projectRoot - RESOLVED (MEDIUM)
+7. ✅ **Grep shell injection** (packages/terminal) - execFileSync instead of execSync - RESOLVED (MEDIUM)
 
-- **Archivos auditados**: 20+ archivos de código crítico
-- **Severidad RESUELTAS**: 2/2 CRITICAS ✅, 5/5 ALTAS ✅, 5/5 MEDIAS ✅, 5/5 BAJAS ✅
-- **Frameworks OWASP**: A01 (Access Control) ✅, A02 (Crypto) ✅, A03 (Injection) ✅, A07 (Auth), A08 (Integrity) ✅
+### Dependencies with CVEs
+
+- **ws ^8.16.0** (terminal) - CVE-2024-37890 (DoS) → Update to >=8.17.1
+
+### Statistics
+
+- **Files audited**: 20+ critical code files
+- **Severity RESOLVED**: 2/2 CRITICAL ✅, 5/5 HIGH ✅, 5/5 MEDIUM ✅, 5/5 LOW ✅
+- **OWASP Frameworks**: A01 (Access Control) ✅, A02 (Crypto) ✅, A03 (Injection) ✅, A07 (Auth), A08 (Integrity) ✅
