@@ -19,16 +19,19 @@ Sistema de autenticacion con OAuth, JWT y hashing de passwords. Maneja credencia
 
 **Severidad global: CRITICA** - 1 CRITICA, 2 ALTAS, 1 MEDIA, 1 BAJA
 
-#### CRITICA-1: Session tokens en plaintext ✅ FIXED
-- **Archivo**: `src/index.ts:111-147`
-- **Issue**: `session.json` guardado sin cifrado y sin permisos restrictivos (mode 0o600)
-- **OWASP**: A02:2021 Cryptographic Failures
-- **Impacto**: accessToken y refreshToken legibles por cualquier usuario/malware local
+#### CRITICA-1: Weak encryption key derivation (ALTA-1) ✅ FIXED
+- **Archivo**: `src/index.ts`
+- **Issue**: Encryption keys derivadas de machine-id predecible (hostname+homedir+uid)
+- **OWASP**: A02:2021 Cryptographic Failures (CWE-330: Use of Insufficiently Random Values)
+- **Impacto**: Atacante con acceso local podría derivar la misma key y descifrar session.json
 - **Fix aplicado (2026-02-16)**:
-  - AES-256-GCM encryption con key derivada de machine-id (PBKDF2 100k iterations)
-  - writeFileSync con mode 0o600 (owner read/write only)
-  - decrypt() retorna null en caso de corrupción/tampering
-  - 8 tests verifican cifrado, permisos y no-exposición de tokens
+  - **OS Keychain Integration**: macOS (Keychain Access), Linux (Secret Service), Windows (Credential Manager)
+  - Keys random de 32 bytes (256 bits) almacenadas en OS keychain nativo
+  - Fallback automático a `legacyMachineKey()` (PBKDF2) con advertencias
+  - AES-256-GCM encryption con IV random de 12 bytes
+  - **Atomic writes**: `atomicWriteFileSync()` con temp-file + fsync + rename
+  - File mode 0o600 (owner read/write only)
+  - 14 tests (6 nuevos de keychain + 8 existentes de encryption)
 - **Estado**: **RESUELTO**
 
 #### ALTA-1: OAuth sin validación de respuesta
@@ -102,5 +105,5 @@ Sistema de autenticacion con OAuth, JWT y hashing de passwords. Maneja credencia
 
 | Fecha | Revisor | Hallazgos | Acciones |
 |-------|---------|-----------|----------|
-| 2026-02-16 | Agente | Audit inicial | 1 CRITICA, 2 ALTAS, 1 BAJA |
-| 2026-02-16 | Agente | CRITICA-1 Fixed | Session encryption implementado |
+| 2026-02-16 | Agente | Audit inicial | 1 CRITICA (weak key derivation), 2 ALTAS, 1 BAJA |
+| 2026-02-16 | Agente | CRITICA-1 Fixed | OS keychain integration + atomic writes implementados |

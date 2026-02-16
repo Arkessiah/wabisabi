@@ -117,18 +117,20 @@ El agente avisara al usuario cada lunes con:
 1. **@wabisabi/plugins** - Arbitrary code execution via `import(pluginPath)` sin validación
    - **Riesgo**: Código malicioso puede ejecutarse con privilegios completos
    - **Acción**: NO USAR sistema de plugins hasta implementar sandboxing
+   - **Estado**: ❌ PENDIENTE
 
-2. **@wabisabi/auth** - Session tokens almacenados en plaintext sin cifrado
-   - **Riesgo**: Cualquier proceso local puede robar access/refresh tokens
-   - **Acción**: Implementar cifrado AES-256-GCM + permisos 0o600
+2. ✅ **@wabisabi/auth** - Session tokens con weak encryption key derivation
+   - **Riesgo**: Encryption keys predecibles por machine-id, atomic writes faltantes
+   - **Acción**: OS keychain integration + atomic writes
+   - **Estado**: ✅ RESUELTO (2026-02-16)
 
 ### Top 5 Prioridades de Fix
 
-1. **Plugin sandboxing** (packages/plugins) - Path validation, integrity checks, Workers
-2. **Auth encryption** (packages/auth) - Cifrar session.json
-3. **Web server hardening** (packages/terminal) - Bind 127.0.0.1, auth token, Origin validation
-4. **File tool containment** (packages/terminal) - Validar paths dentro de projectRoot
-5. **Grep shell injection** (packages/terminal) - Usar execFileSync en vez de execSync
+1. **Plugin sandboxing** (packages/plugins) - Path validation, integrity checks, Workers - ❌ PENDIENTE
+2. ✅ **Auth encryption** (packages/auth) - OS keychain + atomic writes - RESUELTO
+3. **Web server hardening** (packages/terminal) - Bind 127.0.0.1, auth token, Origin validation - ⚠️ PENDIENTE
+4. ✅ **File tool containment** (packages/terminal) - Validar paths dentro de projectRoot - RESUELTO
+5. ✅ **Grep shell injection** (packages/terminal) - Usar execFileSync en vez de execSync - RESUELTO
 
 ### Dependencias con CVEs
 
