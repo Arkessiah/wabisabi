@@ -70,7 +70,9 @@ export function ensureConfigExample(): boolean {
 
   try {
     mkdirSync(WABISABI_DIR, { recursive: true });
-    writeFileSync(CONFIG_FILE, EXAMPLE_CONFIG, "utf-8");
+    // Security (BAJA-3): Restrict permissions to owner-only (rw-------)
+    // Config may contain API keys and should not be readable by other users
+    writeFileSync(CONFIG_FILE, EXAMPLE_CONFIG, { encoding: "utf-8", mode: 0o600 });
     return true;
   } catch {
     return false;

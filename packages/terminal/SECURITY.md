@@ -135,15 +135,30 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
   - `src/db/__tests__/collection-security.test.ts`: 11 tests (todos pasando)
 - **Estado**: **RESUELTO** - Collection names validated, path traversal prevented
 
-#### BAJA-3: Config sin permisos restrictivos
+#### BAJA-3: Config sin permisos restrictivos ✅ FIXED
 - **Archivo**: `src/onboarding.ts:73`
-- **Issue**: writeFileSync sin mode 0o600
-- **Estado**: Pendiente fix
+- **Issue**: writeFileSync sin mode 0o600, config legible por otros usuarios
+- **Fix aplicado (2026-02-16)**:
+  - ✅ Added mode: 0o600 to config file creation in onboarding.ts
+  - ✅ Config files now owner-only readable/writable (rw-------)
+  - ✅ Prevents unauthorized access to API keys in config
+  - ✅ 14 tests verify integration
+- **Estado**: **RESUELTO** - Config files have restrictive permissions
 
-#### BAJA-4: Escrituras no atómicas
+#### BAJA-4: Escrituras no atómicas ✅ FIXED
 - **Archivos**: `src/onboarding.ts`, `src/db/adapters.ts:59`
 - **Issue**: writeFileSync puede corromper datos si crash mid-write
-- **Estado**: Pendiente fix
+- **Fix aplicado (2026-02-16)**:
+  - ✅ Created atomicWriteFileSync() utility with temp-file + rename pattern
+  - ✅ Implemented fsync to ensure data persists to disk before rename
+  - ✅ Applied to 6 critical files: db/adapters, session/storage, config, auth, soul, ram
+  - ✅ Automatic cleanup of temp files on error
+  - ✅ Maintains file permissions and encoding options
+  - ✅ 14 tests verify atomic writes and integration
+- **Archivos creados**:
+  - `src/utils/atomic-write.ts`: Atomic write implementation
+  - `src/utils/__tests__/atomic-write.test.ts`: 14 tests (todos pasando)
+- **Estado**: **RESUELTO** - All critical writes are atomic, data corruption prevented
 
 #### BAJA-5: API key en args de CLI
 - **Archivos**: `src/index.ts:56`, `src/modes/web.ts:70`
@@ -218,3 +233,4 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
 | 2026-02-16 | Agente | MEDIA-4 Fixed | ws actualizado a 8.19.0 (CVE resuelto) |
 | 2026-02-16 | Agente | BAJA-1 Fixed | JWT decode warnings añadidos |
 | 2026-02-16 | Agente | BAJA-2 Fixed | Collection name validation implementada |
+| 2026-02-16 | Agente | BAJA-3/4 Fixed | Config permisos + atomic writes implementados |

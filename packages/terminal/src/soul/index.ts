@@ -8,10 +8,11 @@
  * Future: sync with Substratum (PostgreSQL + Redis)
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { readFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { randomUUID } from "crypto";
+import { atomicWriteFileSync } from "../utils/atomic-write.js";
 import {
   SoulSchema,
   type Soul,
@@ -76,7 +77,8 @@ export class SoulManager {
     try {
       mkdirSync(SOUL_DIR, { recursive: true });
       this.soul.metadata.updatedAt = new Date().toISOString();
-      writeFileSync(SOUL_FILE, JSON.stringify(this.soul, null, 2));
+      // Security (BAJA-4): Atomic write prevents corruption from crashes mid-write
+      atomicWriteFileSync(SOUL_FILE, JSON.stringify(this.soul, null, 2));
       this.dirty = false;
     } catch {
       // Silently fail - don't break the user's workflow

@@ -14,10 +14,11 @@
  * - Cross-session continuity: Last session summary
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { readFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { randomUUID } from "crypto";
+import { atomicWriteFileSync } from "../utils/atomic-write.js";
 import {
   RamSchema,
   type Ram,
@@ -237,7 +238,8 @@ export class RamManager {
     try {
       mkdirSync(RAM_DIR, { recursive: true });
       this.ram.metadata.updatedAt = new Date().toISOString();
-      writeFileSync(RAM_FILE, JSON.stringify(this.ram, null, 2));
+      // Security (BAJA-4): Atomic write prevents corruption from crashes mid-write
+      atomicWriteFileSync(RAM_FILE, JSON.stringify(this.ram, null, 2));
       this.dirty = false;
     } catch {}
   }

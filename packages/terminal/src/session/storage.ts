@@ -8,12 +8,12 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
-  writeFileSync,
   readdirSync,
   unlinkSync,
 } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+import { atomicWriteFileSync } from "../utils/atomic-write.js";
 import type { SessionInfo, SessionSummary } from "./types.js";
 
 export class SessionStorage {
@@ -36,7 +36,8 @@ export class SessionStorage {
     try {
       mkdirSync(this.baseDir, { recursive: true });
       const path = this.getFilePath(session.id);
-      writeFileSync(path, JSON.stringify(session, null, 2), "utf-8");
+      // Security (BAJA-4): Atomic write prevents corruption from crashes mid-write
+      atomicWriteFileSync(path, JSON.stringify(session, null, 2), { encoding: "utf-8" });
     } catch {
       // Session save failed silently - non-critical
     }

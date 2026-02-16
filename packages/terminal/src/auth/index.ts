@@ -13,10 +13,11 @@
  * a substitute for OS keychain -- it prevents casual plaintext leaks.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { readFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { createCipheriv, createDecipheriv, randomBytes, pbkdf2Sync } from "crypto";
+import { atomicWriteFileSync } from "../utils/atomic-write.js";
 
 import { AuthConfigSchema, type AuthConfig, type AuthProvider, type DeviceCodeResponse } from "./schema.js";
 import { decodeJwt, isExpired, needsRefresh } from "./token.js";
@@ -88,7 +89,9 @@ export class AuthManager {
       const dir = join(homedir(), ".wabisabi");
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
       const json = JSON.stringify(this.config);
-      writeFileSync(this.authPath, encrypt(json), { mode: 0o600 });
+      // Security (BAJA-4): Atomic write prevents corruption from crashes mid-write
+      // Security (BAJA-3): Mode 0o600 restricts access to owner only
+      atomicWriteFileSync(this.authPath, encrypt(json), { mode: 0o600 });
     } catch {
       // Non-critical -- tokens stay in memory for this session
     }
@@ -156,7 +159,7 @@ export class AuthManager {
     this.config = null;
     try {
       if (existsSync(this.authPath)) {
-        writeFileSync(this.authPath, "", { mode: 0o600 });
+        atomicWriteFileSync(this.authPath, "", { mode: 0o600 });
       }
     } catch {
       // best-effort cleanup

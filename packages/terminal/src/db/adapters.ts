@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { atomicWriteFileSync } from '../utils/atomic-write.js';
 import type { DatabaseEntity } from './schema';
 
 /**
@@ -71,7 +72,8 @@ export class FileAdapter implements DatabaseAdapter {
 
   private writeCollection<T>(collection: string, data: T[]): void {
     const filePath = this.getFilePath(collection);
-    writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    // Security (BAJA-4): Atomic write prevents corruption from crashes mid-write
+    atomicWriteFileSync(filePath, JSON.stringify(data, null, 2), { encoding: 'utf-8' });
   }
 
   async query<T extends DatabaseEntity>(collection: string, filter?: Partial<T>): Promise<T[]> {

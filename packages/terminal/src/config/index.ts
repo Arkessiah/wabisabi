@@ -4,9 +4,10 @@
  * Handles global (~/.wabisabi/config.jsonc) and project-level (.wabisabi/config.jsonc) config.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { readFileSync, mkdirSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { homedir } from "os";
+import { atomicWriteFileSync } from "../utils/atomic-write.js";
 import {
   GlobalConfigSchema,
   ProjectConfigSchema,
@@ -93,11 +94,13 @@ export class ConfigManager {
       if (scope === "global") {
         const path = this.getGlobalConfigPath();
         mkdirSync(dirname(path), { recursive: true });
-        writeFileSync(path, JSON.stringify(this.globalConfig, null, 2));
+        // Security (BAJA-4): Atomic write prevents corruption from crashes mid-write
+        atomicWriteFileSync(path, JSON.stringify(this.globalConfig, null, 2));
       } else if (scope === "project" && this.projectDir) {
         const path = this.getProjectConfigPath(this.projectDir);
         mkdirSync(dirname(path), { recursive: true });
-        writeFileSync(
+        // Security (BAJA-4): Atomic write prevents corruption from crashes mid-write
+        atomicWriteFileSync(
           path,
           JSON.stringify(this.projectConfig || {}, null, 2),
         );
