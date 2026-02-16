@@ -65,12 +65,19 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
 - **OWASP**: A01:2021 Broken Access Control
 - **Estado**: Pendiente fix
 
-#### MEDIA-2: Shell Injection en grep
-- **Archivo**: `src/tools/grep.ts:45`
+#### MEDIA-2: Shell Injection en grep ✅ FIXED
+- **Archivo**: `src/tools/grep.ts`
 - **Issue**: execSync con args.join(" ") permite metacaracteres shell
 - **OWASP**: A03:2021 Injection
-- **Recomendación**: Usar execFileSync en vez de execSync
-- **Estado**: Pendiente fix
+- **Fix aplicado (2026-02-16)**:
+  - ✅ Reemplazado execSync por execFileSync
+  - ✅ Argumentos pasados como array (no string joined)
+  - ✅ No interpretación de metacaracteres shell
+  - ✅ Comando ejecutado directamente sin shell intermedio
+  - ✅ 6 tests verifican uso correcto de execFileSync
+- **Archivos creados**:
+  - `src/tools/__tests__/grep-security.test.ts`: 6 tests (todos pasando)
+- **Estado**: **RESUELTO** - Grep tool seguro contra shell injection
 
 #### MEDIA-3: ReDoS en glob pattern
 - **Archivo**: `src/tools/glob.ts:19-27`
@@ -174,4 +181,5 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
 | 2026-02-16 | Agente | Audit inicial | 3 ALTAS, 4 MEDIAS, 5 BAJAS |
 | 2026-02-16 | Agente | ALTA-2 Fixed | Bash restrictions implementadas |
 | 2026-02-16 | Agente | ALTA-3 Fixed | Web server security implementado |
+| 2026-02-16 | Agente | MEDIA-2 Fixed | Grep shell injection resuelto (execFileSync) |
 | 2026-02-16 | Agente | MEDIA-4 Fixed | ws actualizado a 8.19.0 (CVE resuelto) |

@@ -2,9 +2,13 @@
  * Grep Tool
  *
  * Searches file contents using ripgrep (with fallback to Node.js regex).
+ *
+ * Security features:
+ * - Uses execFileSync instead of execSync (prevents shell injection)
+ * - Arguments passed as array (no shell metacharacter interpretation)
  */
 
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { readFileSync, readdirSync, statSync } from "fs";
 import { resolve, isAbsolute, join, relative } from "path";
 import { z } from "zod";
@@ -14,7 +18,7 @@ const MAX_MATCHES = 100;
 
 function hasRipgrep(): boolean {
   try {
-    execSync("which rg", { stdio: "ignore" });
+    execFileSync("which", ["rg"], { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -27,7 +31,6 @@ function grepWithRipgrep(
   include?: string,
 ): string {
   const args = [
-    "rg",
     "-nH",
     "--no-messages",
     "--hidden",
@@ -42,7 +45,9 @@ function grepWithRipgrep(
   args.push("--", pattern, searchPath);
 
   try {
-    const output = execSync(args.join(" "), {
+    // Security: Use execFileSync to prevent shell injection
+    // Arguments are passed as array, not joined string
+    const output = execFileSync("rg", args, {
       maxBuffer: 1024 * 1024,
       encoding: "utf-8",
     });
