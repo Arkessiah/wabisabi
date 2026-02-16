@@ -7,7 +7,7 @@
 import { readFileSync, existsSync, statSync } from "fs";
 import { resolve, isAbsolute } from "path";
 import { z } from "zod";
-import { defineTool, addLineNumbers } from "./index.js";
+import { defineTool, addLineNumbers, validatePathWithinProject } from "./index.js";
 
 const BINARY_EXTENSIONS = new Set([
   ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".webp", ".svg",
@@ -56,6 +56,16 @@ export const readTool = defineTool("read", {
     const filePath = isAbsolute(args.filePath)
       ? args.filePath
       : resolve(ctx.projectRoot, args.filePath);
+
+    // Security: Validate path is within project root
+    const validation = validatePathWithinProject(filePath, ctx.projectRoot);
+    if (!validation.valid) {
+      return {
+        title: "Access denied",
+        output: `⛔ ${validation.error}`,
+        metadata: { error: true, blocked: true, filePath },
+      };
+    }
 
     if (!existsSync(filePath)) {
       return {

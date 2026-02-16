@@ -37,6 +37,44 @@ const MAX_LINES = 2000;
 const MAX_BYTES = 50 * 1024; // 50KB
 const MAX_LINE_LENGTH = 2000;
 
+// ── Security: Path Traversal Prevention ───────────────────────
+
+import { normalize, relative, isAbsolute as isAbsolutePath } from "path";
+
+/**
+ * Validates that a resolved path is within the project root.
+ * Prevents path traversal attacks using ../../../etc/passwd patterns.
+ *
+ * @param resolvedPath - The absolute path to validate
+ * @param projectRoot - The project root directory
+ * @returns Validation result with error message if invalid
+ */
+export function validatePathWithinProject(
+  resolvedPath: string,
+  projectRoot: string
+): { valid: boolean; error?: string; normalized?: string } {
+  try {
+    // Normalize both paths to handle . and .. correctly
+    const normalizedRoot = normalize(projectRoot);
+    const normalizedPath = normalize(resolvedPath);
+
+    // Get relative path from project root to resolved path
+    const rel = relative(normalizedRoot, normalizedPath);
+
+    // If rel starts with .. or is absolute, it's outside project root
+    if (rel.startsWith("..") || isAbsolutePath(rel)) {
+      return {
+        valid: false,
+        error: `Access denied: path is outside project root (${projectRoot})`,
+      };
+    }
+
+    return { valid: true, normalized: normalizedPath };
+  } catch (error) {
+    return { valid: false, error: `Path validation failed: ${error}` };
+  }
+}
+
 // ── Permission Mapping ─────────────────────────────────────────
 
 const TOOL_PERMISSION_MAP: Record<string, keyof ToolPermissions> = {

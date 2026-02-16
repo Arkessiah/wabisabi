@@ -7,7 +7,7 @@
 import { readdirSync, statSync } from "fs";
 import { resolve, isAbsolute, join, basename } from "path";
 import { z } from "zod";
-import { defineTool } from "./index.js";
+import { defineTool, validatePathWithinProject } from "./index.js";
 
 const MAX_FILES = 100;
 const DEFAULT_IGNORE = new Set([
@@ -110,6 +110,16 @@ export const listTool = defineTool("list", {
         ? args.path
         : resolve(ctx.projectRoot, args.path)
       : ctx.projectRoot;
+
+    // Security: Validate path is within project root
+    const validation = validatePathWithinProject(dirPath, ctx.projectRoot);
+    if (!validation.valid) {
+      return {
+        title: "Access denied",
+        output: `⛔ ${validation.error}`,
+        metadata: { error: true, blocked: true, path: dirPath },
+      };
+    }
 
     const ignoreSet = new Set([
       ...DEFAULT_IGNORE,

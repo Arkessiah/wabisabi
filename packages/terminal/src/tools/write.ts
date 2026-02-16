@@ -8,7 +8,7 @@
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from "fs";
 import { resolve, isAbsolute, dirname } from "path";
 import { z } from "zod";
-import { defineTool } from "./index.js";
+import { defineTool, validatePathWithinProject } from "./index.js";
 import { generateDiff } from "./diff.js";
 
 export const writeTool = defineTool("write", {
@@ -22,6 +22,16 @@ export const writeTool = defineTool("write", {
     const filePath = isAbsolute(args.filePath)
       ? args.filePath
       : resolve(ctx.projectRoot, args.filePath);
+
+    // Security: Validate path is within project root
+    const validation = validatePathWithinProject(filePath, ctx.projectRoot);
+    if (!validation.valid) {
+      return {
+        title: "Access denied",
+        output: `⛔ ${validation.error}`,
+        metadata: { error: true, blocked: true, filePath },
+      };
+    }
 
     const existed = existsSync(filePath);
     let oldContent = "";

@@ -59,11 +59,20 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
   - `src/modes/__tests__/web-security.test.ts`: 8 tests (todos pasando)
 - **Estado**: **RESUELTO** - Servidor web seguro para uso local
 
-#### MEDIA-1: Path Traversal en file tools
+#### MEDIA-1: Path Traversal en file tools ✅ FIXED
 - **Archivos**: `src/tools/{read,write,edit,glob,list}.ts`
 - **Issue**: Sin validación que path resuelto esté en projectRoot
 - **OWASP**: A01:2021 Broken Access Control
-- **Estado**: Pendiente fix
+- **Fix aplicado (2026-02-16)**:
+  - ✅ Nueva función validatePathWithinProject() en tools/index.ts
+  - ✅ Valida que paths resueltos estén dentro de projectRoot
+  - ✅ Rechaza path traversal con ../../../ patterns
+  - ✅ Aplicado en 5 file tools (read, write, edit, glob, list)
+  - ✅ 16 tests verifican validación y prevención de traversal
+  - ✅ Mensajes de error claros "Access denied: path is outside project root"
+- **Archivos creados**:
+  - `src/tools/__tests__/path-traversal.test.ts`: 16 tests (todos pasando)
+- **Estado**: **RESUELTO** - File tools protegidos contra path traversal
 
 #### MEDIA-2: Shell Injection en grep ✅ FIXED
 - **Archivo**: `src/tools/grep.ts`
@@ -182,4 +191,5 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
 | 2026-02-16 | Agente | ALTA-2 Fixed | Bash restrictions implementadas |
 | 2026-02-16 | Agente | ALTA-3 Fixed | Web server security implementado |
 | 2026-02-16 | Agente | MEDIA-2 Fixed | Grep shell injection resuelto (execFileSync) |
+| 2026-02-16 | Agente | MEDIA-1 Fixed | Path traversal prevention en file tools |
 | 2026-02-16 | Agente | MEDIA-4 Fixed | ws actualizado a 8.19.0 (CVE resuelto) |

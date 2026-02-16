@@ -7,7 +7,7 @@
 import { readdirSync, statSync } from "fs";
 import { resolve, isAbsolute, join, relative } from "path";
 import { z } from "zod";
-import { defineTool } from "./index.js";
+import { defineTool, validatePathWithinProject } from "./index.js";
 
 const MAX_RESULTS = 100;
 const IGNORE_DIRS = new Set([
@@ -87,6 +87,16 @@ export const globTool = defineTool("glob", {
         ? args.path
         : resolve(ctx.projectRoot, args.path)
       : ctx.projectRoot;
+
+    // Security: Validate path is within project root
+    const validation = validatePathWithinProject(searchPath, ctx.projectRoot);
+    if (!validation.valid) {
+      return {
+        title: "Access denied",
+        output: `⛔ ${validation.error}`,
+        metadata: { error: true, blocked: true, path: searchPath },
+      };
+    }
 
     const results: FileEntry[] = [];
     findFiles(searchPath, args.pattern, results, searchPath);
