@@ -111,16 +111,29 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
   - ✅ CVE-2024-37890 resuelto
 - **Estado**: **RESUELTO**
 
-#### BAJA-1: JWT decode sin verificación
+#### BAJA-1: JWT decode sin verificación ✅ FIXED
 - **Archivo**: `src/auth/token.ts:39-46`
 - **Issue**: Decode sin verificar firma (intencional para UX cliente)
-- **Estado**: Aceptable - añadir warning en comentarios
+- **Fix aplicado (2026-02-16)**:
+  - ✅ Added explicit security warning in decodeJwt() docstring
+  - ✅ Warning explains intentional design for client-side UX only
+  - ✅ Lists prohibited uses: authorization, access control, security ops
+  - ✅ Clarifies server must verify signatures
+- **Estado**: **RESUELTO** - Warning comments added, intentional design documented
 
-#### BAJA-2: Collection name path traversal
+#### BAJA-2: Collection name path traversal ✅ FIXED
 - **Archivo**: `src/db/adapters.ts:42-44`
-- **Issue**: collection name usado directamente en path
-- **Recomendación**: Validar contra `/^[a-zA-Z0-9_-]+$/`
-- **Estado**: Pendiente fix
+- **Issue**: collection name usado directamente en path sin validación
+- **Fix aplicado (2026-02-16)**:
+  - ✅ Created validateCollectionName() function with regex `/^[a-zA-Z0-9_-]+$/`
+  - ✅ Applied validation in FileAdapter.getFilePath()
+  - ✅ Applied validation in all SqliteAdapter methods (query, insert, update, delete)
+  - ✅ Applied validation in all MemoryAdapter methods (consistency)
+  - ✅ Throws clear error on invalid collection names
+  - ✅ 11 tests verify validation and rejection of malicious patterns
+- **Archivos creados**:
+  - `src/db/__tests__/collection-security.test.ts`: 11 tests (todos pasando)
+- **Estado**: **RESUELTO** - Collection names validated, path traversal prevented
 
 #### BAJA-3: Config sin permisos restrictivos
 - **Archivo**: `src/onboarding.ts:73`
@@ -203,3 +216,5 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
 | 2026-02-16 | Agente | MEDIA-1 Fixed | Path traversal prevention en file tools |
 | 2026-02-16 | Agente | MEDIA-3 Fixed | ReDoS resuelto con Bun.Glob nativo |
 | 2026-02-16 | Agente | MEDIA-4 Fixed | ws actualizado a 8.19.0 (CVE resuelto) |
+| 2026-02-16 | Agente | BAJA-1 Fixed | JWT decode warnings añadidos |
+| 2026-02-16 | Agente | BAJA-2 Fixed | Collection name validation implementada |

@@ -3,6 +3,19 @@ import { join } from 'path';
 import { homedir } from 'os';
 import type { DatabaseEntity } from './schema';
 
+/**
+ * Validate collection name to prevent path traversal (BAJA-2).
+ * Only allows alphanumeric characters, underscores, and hyphens.
+ * @throws Error if collection name is invalid
+ */
+function validateCollectionName(collection: string): void {
+  if (!/^[a-zA-Z0-9_-]+$/.test(collection)) {
+    throw new Error(
+      `Invalid collection name "${collection}". Only alphanumeric characters, underscores, and hyphens are allowed.`
+    );
+  }
+}
+
 export interface DatabaseAdapter {
   connect(): Promise<void>;
   disconnect(): Promise<void>;
@@ -40,6 +53,8 @@ export class FileAdapter implements DatabaseAdapter {
   }
 
   private getFilePath(collection: string): string {
+    // Security: Validate collection name to prevent path traversal
+    validateCollectionName(collection);
     return join(this.dbPath, `${collection}.json`);
   }
 
@@ -151,6 +166,7 @@ export class SqliteAdapter implements DatabaseAdapter {
   }
 
   async query<T extends DatabaseEntity>(collection: string, filter?: Partial<T>): Promise<T[]> {
+    validateCollectionName(collection);
     if (!this.db) return this.fallback.query(collection, filter);
 
     const stmt = this.db.prepare('SELECT data FROM records WHERE collection = ?');
@@ -169,6 +185,7 @@ export class SqliteAdapter implements DatabaseAdapter {
   }
 
   async insert<T extends DatabaseEntity>(collection: string, record: T): Promise<T> {
+    validateCollectionName(collection);
     if (!this.db) return this.fallback.insert(collection, record);
 
     const stmt = this.db.prepare('INSERT OR REPLACE INTO records (collection, id, data) VALUES (?, ?, ?)');
@@ -177,6 +194,7 @@ export class SqliteAdapter implements DatabaseAdapter {
   }
 
   async update<T extends DatabaseEntity>(collection: string, id: string, updates: Partial<T>): Promise<T | null> {
+    validateCollectionName(collection);
     if (!this.db) return this.fallback.update(collection, id, updates);
 
     const existing = await this.query<T>(collection, { id } as Partial<T>);
@@ -188,6 +206,7 @@ export class SqliteAdapter implements DatabaseAdapter {
   }
 
   async delete(collection: string, id: string): Promise<boolean> {
+    validateCollectionName(collection);
     if (!this.db) return this.fallback.delete(collection, id);
 
     const stmt = this.db.prepare('DELETE FROM records WHERE collection = ? AND id = ?');
@@ -217,6 +236,7 @@ export class MemoryAdapter implements DatabaseAdapter {
   }
 
   async query<T extends DatabaseEntity>(collection: string, filter?: Partial<T>): Promise<T[]> {
+    validateCollectionName(collection);
     const records = (this.store.get(collection) || []) as T[];
     if (!filter) return records;
 
@@ -228,6 +248,7 @@ export class MemoryAdapter implements DatabaseAdapter {
   }
 
   async insert<T extends DatabaseEntity>(collection: string, record: T): Promise<T> {
+    validateCollectionName(collection);
     const records = this.store.get(collection) || [];
     records.push(record);
     this.store.set(collection, records);
@@ -235,6 +256,7 @@ export class MemoryAdapter implements DatabaseAdapter {
   }
 
   async update<T extends DatabaseEntity>(collection: string, id: string, updates: Partial<T>): Promise<T | null> {
+    validateCollectionName(collection);
     const records = (this.store.get(collection) || []) as T[];
     const index = records.findIndex((r: any) => r.id === id);
     if (index === -1) return null;
@@ -245,6 +267,7 @@ export class MemoryAdapter implements DatabaseAdapter {
   }
 
   async delete(collection: string, id: string): Promise<boolean> {
+    validateCollectionName(collection);
     const records = this.store.get(collection) || [];
     const filtered = records.filter((r: any) => r.id !== id);
     if (filtered.length === records.length) return false;

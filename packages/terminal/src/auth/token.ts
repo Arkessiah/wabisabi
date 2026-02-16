@@ -35,6 +35,18 @@ function decodeBase64Url(segment: string): string {
  * Decode a JWT payload without verifying the signature.
  * Returns null for malformed tokens instead of throwing, so callers
  * can treat invalid tokens as "not authenticated".
+ *
+ * ⚠️ SECURITY WARNING (BAJA-1):
+ * This function does NOT verify the JWT signature. It is INTENTIONALLY
+ * insecure for client-side UX purposes ONLY (token lifecycle, refresh prompts).
+ *
+ * DO NOT use decoded claims for:
+ * - Authorization decisions
+ * - Access control
+ * - Security-sensitive operations
+ *
+ * The server MUST always verify signatures before trusting claims.
+ * Client usage is limited to: isExpired(), needsRefresh() checks.
  */
 export function decodeJwt(token: string): JwtPayload | null {
   try {
