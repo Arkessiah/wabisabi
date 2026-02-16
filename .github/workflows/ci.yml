@@ -1,0 +1,107 @@
+name: CI - Test & Build
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run linter
+        run: |
+          # Add linter when configured
+          echo "Linting passed (placeholder)"
+
+      - name: Run tests - Terminal
+        run: |
+          cd packages/terminal
+          bun test
+
+      - name: Run tests - Auth
+        run: |
+          cd packages/auth
+          bun test
+
+      - name: Run tests - Plugins
+        run: |
+          cd packages/plugins
+          bun test
+
+      - name: Build - Terminal
+        run: |
+          cd packages/terminal
+          bun build src/index.ts --outfile dist/index.js --target bun
+
+      - name: Build - Auth
+        run: |
+          cd packages/auth
+          bun build src/index.ts --outfile dist/index.js --target bun
+
+      - name: Build - Plugins
+        run: |
+          cd packages/plugins
+          bun build src/index.ts --outfile dist/index.js --target bun
+
+      - name: Check build size
+        run: |
+          cd packages/terminal
+          SIZE=$(stat -c%s dist/index.js 2>/dev/null || stat -f%z dist/index.js)
+          echo "Terminal build size: $SIZE bytes"
+          if [ $SIZE -gt 1000000 ]; then
+            echo "⚠️  Warning: Build size exceeds 1MB"
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: build-artifacts
+          path: |
+            packages/terminal/dist/
+            packages/auth/dist/
+            packages/plugins/dist/
+          retention-days: 7
+
+  test-matrix:
+    name: Test on Multiple Platforms
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run all tests
+        run: |
+          cd packages/terminal && bun test
+          cd ../auth && bun test
+          cd ../plugins && bun test

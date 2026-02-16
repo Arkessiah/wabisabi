@@ -1,0 +1,127 @@
+{
+  // WabiSabi Terminal - Production Configuration Template
+  // Copy to ~/.wabisabi/config.jsonc and customize for your environment
+  
+  // ── LLM Provider Configuration ──────────────────────────────────
+  
+  // Primary provider (substratum or ollama)
+  "provider": "ollama",
+  
+  // Model to use (e.g., llama3.2, codestral, gpt-4)
+  "model": "llama3.2",
+  
+  // Substratum API endpoint (if using Substratum)
+  "substratum": "${SUBSTRATUM_URL}",  // Read from env var
+  
+  // Ollama endpoint (if using Ollama)
+  "ollama": "http://localhost:11434",
+  
+  // ── Security & Privacy ──────────────────────────────────────────
+  
+  // Privacy mode: "local" (Ollama only), "hybrid" (ask each time), "cloud" (Substratum/OpenAI)
+  "privacy": "local",
+  
+  // Tool permissions (require user confirmation)
+  "tools": {
+    "allowFileRead": true,        // Read files without confirmation
+    "allowFileWrite": false,      // Write files - ALWAYS require confirmation
+    "allowBash": false,           // Execute bash commands - ALWAYS require confirmation
+    "allowNetwork": false,        // Network access - ALWAYS require confirmation
+    "maxFileSize": 1048576,       // Max file read size: 1MB
+    "blockedPaths": [             // Paths that tools cannot access
+      "/etc/passwd",
+      "/etc/shadow",
+      "~/.ssh/",
+      "~/.aws/",
+      "/proc/",
+      "/sys/"
+    ]
+  },
+  
+  // ── Web Server ──────────────────────────────────────────────────
+  
+  "web": {
+    "enabled": false,             // Disabled by default (security)
+    "hostname": "127.0.0.1",      // NEVER use 0.0.0.0 in production
+    "port": 3333,
+    "sessionTimeout": 3600000     // 1 hour in ms
+  },
+  
+  // ── Plugin System ───────────────────────────────────────────────
+  
+  "plugins": {
+    "enabled": false,             // Disabled until sandboxing is fully tested
+    "allowedPlugins": [],         // Whitelist of allowed plugin names
+    "pluginPath": "~/.wabisabi/plugins",
+    "autoUpdate": false           // Never auto-update in production
+  },
+  
+  // ── Memory & Context ────────────────────────────────────────────
+  
+  "memory": {
+    "soul": {
+      "enabled": true,
+      "path": "~/.wabisabi/soul.json",
+      "maxSize": 10485760,        // 10MB max
+      "saveInterval": 5000        // Save every 5 seconds
+    },
+    "ram": {
+      "enabled": true,
+      "path": "~/.wabisabi/ram.json",
+      "maxSize": 5242880,         // 5MB max
+      "saveInterval": 3000        // Save every 3 seconds
+    },
+    "conversationHistory": {
+      "maxMessages": 100,         // Keep last 100 messages
+      "maxTokens": 50000          // ~50k tokens max
+    }
+  },
+  
+  // ── Logging ─────────────────────────────────────────────────────
+  
+  "logging": {
+    "level": "info",              // debug, info, warn, error
+    "file": "~/.wabisabi/wabisabi.log",
+    "maxSize": 10485760,          // 10MB max
+    "rotate": true                // Rotate when maxSize reached
+  },
+  
+  // ── Performance ─────────────────────────────────────────────────
+  
+  "performance": {
+    "maxConcurrentRequests": 3,   // Max parallel LLM requests
+    "requestTimeout": 120000,     // 2 minutes
+    "contextCompaction": {
+      "enabled": true,
+      "threshold": 40000,         // Compact when > 40k tokens
+      "targetSize": 20000         // Compact to ~20k tokens
+    }
+  },
+  
+  // ── Database ────────────────────────────────────────────────────
+  
+  "database": {
+    "adapter": "file",            // file or memory
+    "path": "~/.wabisabi/db",
+    "cache": {
+      "enabled": true,
+      "ttl": 300000               // 5 minutes
+    }
+  },
+  
+  // ── Agent Configuration ─────────────────────────────────────────
+  
+  "agents": {
+    "default": "build",           // Default agent on startup
+    "available": ["build", "plan", "search"],
+    "autoSwitch": false           // Don't auto-switch agents
+  },
+  
+  // ── Monitoring (Optional) ───────────────────────────────────────
+  
+  "monitoring": {
+    "enabled": false,
+    "metricsEndpoint": "",        // Prometheus/StatsD endpoint
+    "healthCheckInterval": 60000  // 1 minute
+  }
+}

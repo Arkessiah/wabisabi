@@ -1,0 +1,99 @@
+# WabiSabi Terminal with Ollama - Docker Compose
+version: '3.8'
+
+services:
+  # ── Ollama LLM Server ──────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: wabisabi-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          # Adjust based on available GPU/CPU
+          cpus: '4'
+          memory: 8G
+
+  # ── WabiSabi Terminal ──────────────────────────────────────────
+  wabisabi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wabisabi-terminal
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      # Persist WabiSabi data
+      - wabisabi_data:/app/.wabisabi
+      # Mount project directory (optional - for development)
+      # - ./:/workspace:ro
+    environment:
+      # LLM Provider Configuration
+      - OLLAMA_URL=http://ollama:11434
+      - MODEL=llama3.2
+      
+      # Security: Use env vars instead of CLI args
+      - WABISABI_API_KEY=${WABISABI_API_KEY:-}
+      - SUBSTRATUM_URL=${SUBSTRATUM_URL:-}
+      
+      # Privacy Settings
+      - PRIVACY_MODE=local
+      
+      # Runtime
+      - NODE_ENV=production
+      - FORCE_COLOR=1
+    stdin_open: true
+    tty: true
+    command: ["bun", "run", "packages/terminal/dist/index.js", "interactive", "--ollama", "http://ollama:11434", "--model", "llama3.2"]
+
+  # ── Web UI (Optional) ──────────────────────────────────────────
+  wabisabi-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wabisabi-web
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    ports:
+      - "3333:3333"
+    volumes:
+      - wabisabi_web_data:/app/.wabisabi
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - MODEL=llama3.2
+      - WABISABI_API_KEY=${WABISABI_API_KEY:-}
+      - SUBSTRATUM_URL=${SUBSTRATUM_URL:-}
+      - NODE_ENV=production
+    command: ["bun", "run", "packages/terminal/dist/index.js", "web", "--port", "3333", "--ollama", "http://ollama:11434"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3333"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  ollama_data:
+    driver: local
+  wabisabi_data:
+    driver: local
+  wabisabi_web_data:
+    driver: local
+
+networks:
+  default:
+    name: wabisabi-network

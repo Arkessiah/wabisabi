@@ -1,0 +1,52 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Build artifacts
+dist
+build
+*.log
+
+# Tests
+**/__tests__
+**/*.test.ts
+**/*.spec.ts
+coverage
+
+# Documentation
+*.md
+!README.md
+docs
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# WabiSabi data (will be mounted as volume)
+.wabisabi
+
+# Claude Code
+.claude
+
+# Temporary files
+tmp
+temp
+*.tmp
