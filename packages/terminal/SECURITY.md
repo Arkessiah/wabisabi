@@ -36,12 +36,20 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
 - **Recomendación**: Allowlist de env vars, blocklist de comandos destructivos
 - **Estado**: Pendiente fix
 
-#### ALTA-3: Web Server - Sin autenticación
-- **Archivo**: `src/modes/web.ts:87-132`
+#### ALTA-3: Web Server - Sin autenticación ✅ FIXED
+- **Archivo**: `src/modes/web.ts`
 - **Issue**: Bind 0.0.0.0, sin auth, sin CORS, sin Origin validation, CDN sin SRI
 - **OWASP**: A01:2021 Broken Access Control
-- **Recomendación**: Bind 127.0.0.1, token de sesión, validar Origin, añadir security headers
-- **Estado**: Pendiente fix
+- **Fix aplicado (2026-02-16)**:
+  - ✅ Bind exclusivo a 127.0.0.1 (localhost only)
+  - ✅ Session token generado con randomBytes(32) y validado en WebSocket upgrade
+  - ✅ Origin validation implementada (rechaza origins externos)
+  - ✅ Security headers: X-Frame-Options, X-Content-Type-Options, CSP, Referrer-Policy, etc.
+  - ✅ SRI (Subresource Integrity) en scripts CDN de xterm.js
+  - ✅ 8 tests verifican configuración de seguridad
+- **Archivos creados**:
+  - `src/modes/__tests__/web-security.test.ts`: 8 tests (todos pasando)
+- **Estado**: **RESUELTO** - Servidor web seguro para uso local
 
 #### MEDIA-1: Path Traversal en file tools
 - **Archivos**: `src/tools/{read,write,edit,glob,list}.ts`
@@ -153,4 +161,5 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
 
 | Fecha | Revisor | Hallazgos | Acciones |
 |-------|---------|-----------|----------|
-| 2026-02-16 | Agente | Audit inicial | Pendiente resultados |
+| 2026-02-16 | Agente | Audit inicial | 3 ALTAS, 4 MEDIAS, 5 BAJAS |
+| 2026-02-16 | Agente | ALTA-3 Fixed | Web server security implementado |
