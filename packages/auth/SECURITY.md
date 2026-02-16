@@ -19,13 +19,17 @@ Sistema de autenticacion con OAuth, JWT y hashing de passwords. Maneja credencia
 
 **Severidad global: CRITICA** - 1 CRITICA, 2 ALTAS, 1 MEDIA, 1 BAJA
 
-#### CRITICA-1: Session tokens en plaintext
-- **Archivo**: `src/index.ts:112-117`
+#### CRITICA-1: Session tokens en plaintext ✅ FIXED
+- **Archivo**: `src/index.ts:111-147`
 - **Issue**: `session.json` guardado sin cifrado y sin permisos restrictivos (mode 0o600)
 - **OWASP**: A02:2021 Cryptographic Failures
 - **Impacto**: accessToken y refreshToken legibles por cualquier usuario/malware local
-- **Recomendación**: Cifrar como en packages/terminal/src/auth/index.ts (AES-256-GCM)
-- **Estado**: **CRITICO - Fix inmediato requerido**
+- **Fix aplicado (2026-02-16)**:
+  - AES-256-GCM encryption con key derivada de machine-id (PBKDF2 100k iterations)
+  - writeFileSync con mode 0o600 (owner read/write only)
+  - decrypt() retorna null en caso de corrupción/tampering
+  - 8 tests verifican cifrado, permisos y no-exposición de tokens
+- **Estado**: **RESUELTO**
 
 #### ALTA-1: OAuth sin validación de respuesta
 - **Archivo**: `src/index.ts:35-59`
@@ -98,4 +102,5 @@ Sistema de autenticacion con OAuth, JWT y hashing de passwords. Maneja credencia
 
 | Fecha | Revisor | Hallazgos | Acciones |
 |-------|---------|-----------|----------|
-| 2026-02-16 | Agente | Audit inicial | Pendiente resultados |
+| 2026-02-16 | Agente | Audit inicial | 1 CRITICA, 2 ALTAS, 1 BAJA |
+| 2026-02-16 | Agente | CRITICA-1 Fixed | Session encryption implementado |

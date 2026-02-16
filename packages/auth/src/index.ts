@@ -1,3 +1,15 @@
+/**
+ * WabiSabi Auth Package
+ *
+ * Session tokens are encrypted at-rest using AES-256-GCM with a key derived
+ * from machine-id (hostname + homedir + uid) via PBKDF2. This prevents
+ * casual plaintext leaks but is NOT a substitute for OS keychain.
+ */
+
+import { createCipheriv, createDecipheriv, randomBytes, pbkdf2Sync } from "crypto";
+import { mkdirSync, existsSync, writeFileSync, readFileSync, unlinkSync } from "fs";
+import { homedir } from "os";
+
 export interface User {
   id: string;
   email: string;
@@ -20,6 +32,37 @@ export interface AuthSession {
   refreshToken: string;
   expiresAt: Date;
 }
+
+// ── Encryption helpers ─────────────────────────────────────────
+
+const ALGO = "aes-256-gcm" as const;
+const SALT = "wabisabi-auth-v1";
+
+function machineKey(): Buffer {
+  const seed = `${require("os").hostname()}:${homedir()}:${process.getuid?.() ?? 0}`;
+  return pbkdf2Sync(seed, SALT, 100_000, 32, "sha512");
+}
+
+function encrypt(plaintext: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv(ALGO, machineKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, "utf-8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return [iv.toString("hex"), tag.toString("hex"), encrypted.toString("hex")].join(":");
+}
+
+function decrypt(packed: string): string | null {
+  try {
+    const [ivHex, tagHex, dataHex] = packed.split(":");
+    const decipher = createDecipheriv(ALGO, machineKey(), Buffer.from(ivHex, "hex"));
+    decipher.setAuthTag(Buffer.from(tagHex, "hex"));
+    return Buffer.concat([decipher.update(Buffer.from(dataHex, "hex")), decipher.final()]).toString("utf-8");
+  } catch {
+    return null;
+  }
+}
+
+// ── AuthSystem ─────────────────────────────────────────────────
 
 class AuthSystem {
   private session: AuthSession | null = null;
@@ -109,19 +152,32 @@ class AuthSystem {
   }
 
   private saveSession(): void {
-    if (this.session) {
-      Bun.write(
-        Bun.env.HOME + "/.wabisabi/session.json",
-        JSON.stringify(this.session),
-      );
+    if (!this.session) return;
+    try {
+      const dir = homedir() + "/.wabisabi";
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      const json = JSON.stringify(this.session);
+      const sessionPath = dir + "/session.json";
+      writeFileSync(sessionPath, encrypt(json), { mode: 0o600 });
+    } catch (error) {
+      console.error("⚠️ Failed to save session:", error);
     }
   }
 
   private loadSession(): void {
     try {
-      const sessionFile = Bun.env.HOME + "/.wabisabi/session.json";
-      const content = Bun.file(sessionFile).text();
-      this.session = JSON.parse(content);
+      const sessionPath = homedir() + "/.wabisabi/session.json";
+      if (!existsSync(sessionPath)) {
+        this.session = null;
+        return;
+      }
+      const raw = readFileSync(sessionPath, "utf-8");
+      const decrypted = decrypt(raw);
+      if (!decrypted) {
+        this.session = null;
+        return;
+      }
+      this.session = JSON.parse(decrypted);
     } catch {
       this.session = null;
     }
@@ -129,7 +185,10 @@ class AuthSystem {
 
   private clearSession(): void {
     try {
-      Bun.deleteFile(Bun.env.HOME + "/.wabisabi/session.json");
+      const sessionPath = homedir() + "/.wabisabi/session.json";
+      if (existsSync(sessionPath)) {
+        unlinkSync(sessionPath);
+      }
     } catch {}
   }
 
