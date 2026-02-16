@@ -160,10 +160,16 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
   - `src/utils/__tests__/atomic-write.test.ts`: 14 tests (todos pasando)
 - **Estado**: **RESUELTO** - All critical writes are atomic, data corruption prevented
 
-#### BAJA-5: API key en args de CLI
+#### BAJA-5: API key en args de CLI ✅ DEPRECATED
 - **Archivos**: `src/index.ts:56`, `src/modes/web.ts:70`
-- **Issue**: --api-key visible en `ps aux`
-- **Estado**: Pendiente deprecar opción CLI
+- **Issue**: --api-key visible en `ps aux`, expone credenciales
+- **Fix aplicado (2026-02-16)**:
+  - ✅ Marked --api-key flag as [DEPRECATED] in CLI help
+  - ✅ Added runtime warning when --api-key is used
+  - ✅ Warning recommends WABISABI_API_KEY env var instead
+  - ✅ Explains security risk (visible in process list)
+  - ✅ Flag still works for backward compatibility but will be removed
+- **Estado**: **DEPRECADO** - Users warned to migrate to env var
 
 <!-- El agente de seguridad añadira detecciones aqui en cada revision -->
 
@@ -234,3 +240,4 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
 | 2026-02-16 | Agente | BAJA-1 Fixed | JWT decode warnings añadidos |
 | 2026-02-16 | Agente | BAJA-2 Fixed | Collection name validation implementada |
 | 2026-02-16 | Agente | BAJA-3/4 Fixed | Config permisos + atomic writes implementados |
+| 2026-02-16 | Agente | BAJA-5 Deprecated | --api-key flag deprecado con warnings |

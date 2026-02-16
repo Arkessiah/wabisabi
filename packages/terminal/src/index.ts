@@ -52,7 +52,7 @@ program
   .option("--substratum <url>", "Substratum API URL", "http://localhost:3001")
   .option("--ollama <url>", "Ollama local URL", "http://localhost:11434")
   .option("--model <name>", "Model to use", "llama3.2")
-  .option("--api-key <key>", "API key (or set WABISABI_API_KEY env)")
+  .option("--api-key <key>", "[DEPRECATED] API key - use WABISABI_API_KEY env var instead")
   .option(
     "--privacy <level>",
     "Privacy level (local, hybrid, semi, full)",
@@ -533,5 +533,13 @@ if (process.argv.length <= 2) {
 }
 
 program.parse();
+
+// Security (BAJA-5): Warn about deprecated --api-key flag
+const opts = program.opts() as CLIOptions;
+if (opts.apiKey) {
+  console.warn("\n⚠️  WARNING: --api-key flag is DEPRECATED and will be removed in a future version.");
+  console.warn("   Security risk: API keys visible in process list (ps aux)");
+  console.warn("   Use environment variable instead: export WABISABI_API_KEY=your-key\n");
+}
 
 export { program };
