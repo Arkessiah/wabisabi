@@ -1,72 +1,21 @@
 /**
  * Glob Tool
  *
- * Find files matching a glob pattern.
+ * Find files matching a glob pattern using Bun's native Glob API.
+ * Security: Uses Bun.Glob (implemented in Zig) to prevent ReDoS vulnerabilities.
  */
 
-import { readdirSync, statSync } from "fs";
-import { resolve, isAbsolute, join, relative } from "path";
+import { statSync } from "fs";
+import { resolve, isAbsolute } from "path";
+import { Glob } from "bun";
 import { z } from "zod";
 import { defineTool, validatePathWithinProject } from "./index.js";
 
 const MAX_RESULTS = 100;
-const IGNORE_DIRS = new Set([
-  "node_modules", ".git", "dist", "build", ".next",
-  "__pycache__", ".venv", "venv", "target", "vendor",
-  ".idea", ".vscode", "coverage",
-]);
-
-function matchGlob(fileName: string, pattern: string): boolean {
-  const regexStr = pattern
-    .replace(/\./g, "\\.")
-    .replace(/\*\*/g, "<<GLOBSTAR>>")
-    .replace(/\*/g, "[^/]*")
-    .replace(/\?/g, ".")
-    .replace(/<<GLOBSTAR>>/g, ".*");
-  return new RegExp(`^${regexStr}$`).test(fileName);
-}
 
 interface FileEntry {
   path: string;
   mtime: number;
-}
-
-function findFiles(
-  dir: string,
-  pattern: string,
-  results: FileEntry[],
-  baseDir: string,
-): void {
-  if (results.length >= MAX_RESULTS) return;
-
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-
-  for (const entry of entries) {
-    if (results.length >= MAX_RESULTS) break;
-
-    const fullPath = join(dir, entry.name);
-
-    if (entry.isDirectory()) {
-      if (!IGNORE_DIRS.has(entry.name)) {
-        findFiles(fullPath, pattern, results, baseDir);
-      }
-    } else if (entry.isFile()) {
-      const relPath = relative(baseDir, fullPath);
-      if (matchGlob(relPath, pattern) || matchGlob(entry.name, pattern)) {
-        try {
-          const stat = statSync(fullPath);
-          results.push({ path: fullPath, mtime: stat.mtimeMs });
-        } catch {
-          results.push({ path: fullPath, mtime: 0 });
-        }
-      }
-    }
-  }
 }
 
 export const globTool = defineTool("glob", {
@@ -98,8 +47,33 @@ export const globTool = defineTool("glob", {
       };
     }
 
+    // Security: Use Bun.Glob (implemented in Zig) to prevent ReDoS vulnerabilities
+    // Manual regex conversion is vulnerable to catastrophic backtracking
+    const glob = new Glob(args.pattern);
     const results: FileEntry[] = [];
-    findFiles(searchPath, args.pattern, results, searchPath);
+
+    try {
+      // Scan directory with pattern
+      for await (const file of glob.scan({ cwd: searchPath })) {
+        if (results.length >= MAX_RESULTS) break;
+
+        const fullPath = resolve(searchPath, file);
+
+        try {
+          const stat = statSync(fullPath);
+          results.push({ path: fullPath, mtime: stat.mtimeMs });
+        } catch {
+          // File might have been deleted during scan
+          results.push({ path: fullPath, mtime: 0 });
+        }
+      }
+    } catch (error) {
+      return {
+        title: "Glob error",
+        output: `Cannot execute glob pattern "${args.pattern}": ${error instanceof Error ? error.message : "unknown error"}`,
+        metadata: { error: true, pattern: args.pattern },
+      };
+    }
 
     // Sort by mtime descending (newest first)
     results.sort((a, b) => b.mtime - a.mtime);

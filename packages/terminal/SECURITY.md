@@ -88,11 +88,20 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
   - `src/tools/__tests__/grep-security.test.ts`: 6 tests (todos pasando)
 - **Estado**: **RESUELTO** - Grep tool seguro contra shell injection
 
-#### MEDIA-3: ReDoS en glob pattern
+#### MEDIA-3: ReDoS en glob pattern ✅ FIXED
 - **Archivo**: `src/tools/glob.ts:19-27`
-- **Issue**: Conversión glob->regex sin escapar metacaracteres
+- **Issue**: Conversión glob->regex manual vulnerable a catastrophic backtracking
 - **OWASP**: A03:2021 Injection (ReDoS)
-- **Estado**: Pendiente fix
+- **Fix aplicado (2026-02-16)**:
+  - ✅ Reemplazada conversión manual glob→regex por Bun.Glob nativo
+  - ✅ Bun.Glob implementado en Zig (sin vulnerabilidad ReDoS)
+  - ✅ Eliminada función matchGlob() vulnerable
+  - ✅ Usa glob.scan() API segura con async iteration
+  - ✅ Mantiene MAX_RESULTS y path validation
+  - ✅ 8 tests verifican uso de Bun.Glob y ausencia de regex manual
+- **Archivos creados**:
+  - `src/tools/__tests__/glob-security.test.ts`: 8 tests (todos pasando)
+- **Estado**: **RESUELTO** - Glob tool usa implementación nativa sin ReDoS
 
 #### MEDIA-4: CVE-2024-37890 en ws dependency ✅ FIXED
 - **Package**: ws ^8.16.0 → ^8.19.0
@@ -192,4 +201,5 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
 | 2026-02-16 | Agente | ALTA-3 Fixed | Web server security implementado |
 | 2026-02-16 | Agente | MEDIA-2 Fixed | Grep shell injection resuelto (execFileSync) |
 | 2026-02-16 | Agente | MEDIA-1 Fixed | Path traversal prevention en file tools |
+| 2026-02-16 | Agente | MEDIA-3 Fixed | ReDoS resuelto con Bun.Glob nativo |
 | 2026-02-16 | Agente | MEDIA-4 Fixed | ws actualizado a 8.19.0 (CVE resuelto) |
