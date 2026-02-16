@@ -29,12 +29,20 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
 - **Recomendación**: Usar OS keychain o generar salt aleatorio por cifrado
 - **Estado**: Pendiente fix
 
-#### ALTA-2: Unrestricted Bash Execution
-- **Archivo**: `src/tools/bash.ts:50`, `src/tools/git.ts:98`
+#### ALTA-2: Unrestricted Bash Execution ✅ FIXED
+- **Archivo**: `src/tools/bash.ts`
 - **Issue**: Comando arbitrario sin blocklist + env completo con secretos
 - **OWASP**: A03:2021 Injection
-- **Recomendación**: Allowlist de env vars, blocklist de comandos destructivos
-- **Estado**: Pendiente fix
+- **Fix aplicado (2026-02-16)**:
+  - ✅ Environment allowlist: Solo 19 vars seguras (PATH, HOME, USER, etc.)
+  - ✅ Bloqueados: API_KEY, SECRET, TOKEN, PASSWORD, AWS_*, GITHUB_TOKEN, etc.
+  - ✅ Command blocklist: 12 patterns destructivos bloqueados
+  - ✅ Validación pre-ejecución con mensajes de error claros
+  - ✅ Bloqueados: rm -rf, dd, mkfs, fork bomb, curl|sh, sudo rm, etc.
+  - ✅ 9 tests verifican allowlist y blocklist
+- **Archivos creados**:
+  - `src/tools/__tests__/bash-security.test.ts`: 9 tests (todos pasando)
+- **Estado**: **RESUELTO** - Ejecución de bash restringida y segura
 
 #### ALTA-3: Web Server - Sin autenticación ✅ FIXED
 - **Archivo**: `src/modes/web.ts`
@@ -164,5 +172,6 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
 | Fecha | Revisor | Hallazgos | Acciones |
 |-------|---------|-----------|----------|
 | 2026-02-16 | Agente | Audit inicial | 3 ALTAS, 4 MEDIAS, 5 BAJAS |
+| 2026-02-16 | Agente | ALTA-2 Fixed | Bash restrictions implementadas |
 | 2026-02-16 | Agente | ALTA-3 Fixed | Web server security implementado |
 | 2026-02-16 | Agente | MEDIA-4 Fixed | ws actualizado a 8.19.0 (CVE resuelto) |
