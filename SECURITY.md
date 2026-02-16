@@ -124,13 +124,15 @@ El agente avisara al usuario cada lunes con:
    - **Acción**: OS keychain integration + atomic writes
    - **Estado**: ✅ RESUELTO (2026-02-16)
 
-### Top 5 Prioridades de Fix
+### Top 7 Prioridades de Fix (CRITICAS + ALTAS)
 
-1. ✅ **Plugin sandboxing** (packages/plugins) - Bun Workers + permission enforcement - RESUELTO
-2. ✅ **Auth encryption** (packages/auth) - OS keychain + atomic writes - RESUELTO
-3. **Web server hardening** (packages/terminal) - Bind 127.0.0.1, auth token, Origin validation - ⚠️ PENDIENTE
-4. ✅ **File tool containment** (packages/terminal) - Validar paths dentro de projectRoot - RESUELTO
-5. ✅ **Grep shell injection** (packages/terminal) - Usar execFileSync en vez de execSync - RESUELTO
+1. ✅ **Plugin sandboxing** (packages/plugins) - Bun Workers + permission enforcement - RESUELTO (CRITICA-2)
+2. ✅ **Auth encryption** (packages/auth + terminal) - OS keychain + atomic writes - RESUELTO (CRITICA-1)
+3. ✅ **Web server hardening** (packages/terminal) - Localhost binding, token auth, Origin validation, API key via env - RESUELTO (ALTA-3, 2026-02-16)
+4. ✅ **Bash execution restrictions** (packages/terminal) - Env allowlist, command blocklist, destructive operation blocking - RESUELTO (ALTA-4)
+5. ✅ **Encryption key derivation** (packages/terminal/auth) - OS keychain with PBKDF2 fallback - RESUELTO (ALTA-5)
+6. ✅ **File tool containment** (packages/terminal) - Path validation dentro de projectRoot - RESUELTO (MEDIA)
+7. ✅ **Grep shell injection** (packages/terminal) - execFileSync en vez de execSync - RESUELTO (MEDIA)
 
 ### Dependencias con CVEs
 
@@ -139,5 +141,5 @@ El agente avisara al usuario cada lunes con:
 ### Estadísticas
 
 - **Archivos auditados**: 20+ archivos de código crítico
-- **Severidad RESUELTAS**: 2/2 CRITICAS ✅, 1/5 ALTAS, 5/5 MEDIAS ✅, 5/5 BAJAS ✅
+- **Severidad RESUELTAS**: 2/2 CRITICAS ✅, 5/5 ALTAS ✅, 5/5 MEDIAS ✅, 5/5 BAJAS ✅
 - **Frameworks OWASP**: A01 (Access Control) ✅, A02 (Crypto) ✅, A03 (Injection) ✅, A07 (Auth), A08 (Integrity) ✅
