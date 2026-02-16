@@ -8,10 +8,10 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
 
 | Paquete | Version | Ultima estable | Estado | Notas |
 |---------|---------|----------------|--------|-------|
-| ws | ^8.16.0 | 8.18.x | Revisar | WebSocket client/server |
-| zod | ^3.22.0 | 3.24.x | Revisar | Validacion de schemas |
-| chalk | ^5.3.0 | 5.4.x | OK | Solo formateo terminal |
-| commander | ^12.0.0 | 12.1.x | OK | CLI framework |
+| ws | ^8.19.0 | 8.19.x | ✅ OK | CVE-2024-37890 resuelto |
+| zod | ^3.25.76 | 3.25.x (v4 beta) | ✅ OK | Validacion de schemas |
+| chalk | ^5.6.2 | 5.6.x | ✅ OK | Solo formateo terminal |
+| commander | ^12.1.0 | 12.1.x (v14 beta) | ✅ OK | CLI framework |
 | bun-types | ^1.0.0 | 1.2.x | Revisar | Solo devDependency |
 
 ## Detecciones del Agente de Seguridad
@@ -70,11 +70,13 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
 - **OWASP**: A03:2021 Injection (ReDoS)
 - **Estado**: Pendiente fix
 
-#### MEDIA-4: CVE-2024-37890 en ws dependency
-- **Package**: ws ^8.16.0
+#### MEDIA-4: CVE-2024-37890 en ws dependency ✅ FIXED
+- **Package**: ws ^8.16.0 → ^8.19.0
 - **CVE**: CVE-2024-37890 (CVSS 7.5) - DoS via large HTTP headers
-- **Fix**: Actualizar a ws >=8.17.1
-- **Estado**: Pendiente `bun update ws`
+- **Fix aplicado (2026-02-16)**:
+  - ✅ Actualizado ws a 8.19.0 (>= 8.17.1 requerido)
+  - ✅ CVE-2024-37890 resuelto
+- **Estado**: **RESUELTO**
 
 #### BAJA-1: JWT decode sin verificación
 - **Archivo**: `src/auth/token.ts:39-46`
@@ -163,3 +165,4 @@ Paquete CLI principal con acceso a filesystem, ejecucion de comandos shell, serv
 |-------|---------|-----------|----------|
 | 2026-02-16 | Agente | Audit inicial | 3 ALTAS, 4 MEDIAS, 5 BAJAS |
 | 2026-02-16 | Agente | ALTA-3 Fixed | Web server security implementado |
+| 2026-02-16 | Agente | MEDIA-4 Fixed | ws actualizado a 8.19.0 (CVE resuelto) |
