@@ -1,3 +1,8 @@
+import { readFileSync, existsSync } from "fs";
+import { join, dirname } from "path";
+import { PluginManifestSchema } from "./schemas";
+import { validatePluginPath, verifyChecksum } from "./security";
+
 export interface Plugin {
   name: string;
   version: string;
@@ -60,21 +65,80 @@ export class PluginManager {
 
   async loadPlugin(pluginPath: string): Promise<void> {
     try {
-      const pluginModule = await import(pluginPath);
+      // Step 1: Validate plugin path against allowlist
+      const pathValidation = validatePluginPath(pluginPath);
+      if (!pathValidation.valid) {
+        throw new Error(`Plugin path validation failed: ${pathValidation.error}`);
+      }
+      const normalizedPath = pathValidation.normalized!;
+
+      // Step 2: Read and validate manifest.json
+      const pluginDir = normalizedPath.endsWith(".ts") || normalizedPath.endsWith(".js")
+        ? dirname(normalizedPath)
+        : normalizedPath;
+
+      const manifestPath = join(pluginDir, "manifest.json");
+      if (!existsSync(manifestPath)) {
+        throw new Error(`Plugin manifest not found at ${manifestPath}`);
+      }
+
+      const manifestRaw = readFileSync(manifestPath, "utf-8");
+      const manifestJson = JSON.parse(manifestRaw);
+      const manifestResult = PluginManifestSchema.safeParse(manifestJson);
+
+      if (!manifestResult.success) {
+        throw new Error(`Invalid plugin manifest: ${manifestResult.error.message}`);
+      }
+      const manifest = manifestResult.data;
+
+      // Step 3: Determine entry file
+      const entryFile = manifest.entry ?? "index.js";
+      const entryPath = join(pluginDir, entryFile);
+
+      if (!existsSync(entryPath)) {
+        throw new Error(`Plugin entry file not found: ${entryPath}`);
+      }
+
+      // Step 4: Verify checksum
+      if (!verifyChecksum(entryPath, manifest.checksum.hash)) {
+        throw new Error(
+          `Checksum verification failed for ${entryPath}. ` +
+          `Expected ${manifest.checksum.hash} but file content doesn't match. ` +
+          `This could indicate tampering or corruption.`
+        );
+      }
+
+      // Step 5: Import plugin (only after all validations pass)
+      const pluginModule = await import(entryPath);
       const plugin = pluginModule.default || pluginModule.plugin;
 
       if (!plugin) {
-        throw new Error(`No plugin export found in ${pluginPath}`);
+        throw new Error(`No plugin export found in ${entryPath}`);
       }
 
-      this.plugins.set(plugin.name, plugin);
-      console.log(`[Plugin] Loaded: ${plugin.name} v${plugin.version}`);
+      // Verify plugin metadata matches manifest
+      if (plugin.name !== manifest.name) {
+        throw new Error(
+          `Plugin name mismatch: manifest declares "${manifest.name}" but plugin exports "${plugin.name}"`
+        );
+      }
+      if (plugin.version !== manifest.version) {
+        throw new Error(
+          `Plugin version mismatch: manifest declares "${manifest.version}" but plugin exports "${plugin.version}"`
+        );
+      }
 
+      // Step 6: Register plugin
+      this.plugins.set(plugin.name, plugin);
+      console.log(`[Plugin] Loaded: ${plugin.name} v${plugin.version} (verified)`);
+
+      // Step 7: Call onLoad hook
       if (plugin.onLoad) {
         await plugin.onLoad(this.context);
       }
     } catch (error) {
       console.error(`[Plugin] Failed to load ${pluginPath}:`, error);
+      throw error; // Re-throw to prevent silent failures
     }
   }
 
