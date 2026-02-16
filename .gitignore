@@ -141,6 +141,7 @@ vite.config.ts.timestamp-*
 #personal
 .DS_Store
 BASE/
+.claude/
 
 # Documentation (local planning files - never commit)
 *.md

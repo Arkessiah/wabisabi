@@ -1,64 +1,69 @@
-import { CLIOptions } from "../../clients/api-client.js";
-import { ApiClient } from "../../clients/api-client.js";
+/**
+ * Build Agent
+ *
+ * Full-featured coding agent with read/write/execute access.
+ * This is the primary agent for implementing features, fixing bugs,
+ * and refactoring code.
+ */
 
-export class BuildAgent {
-  private client: ApiClient;
-  private opts: CLIOptions;
+import { BaseAgent } from "../base-agent.js";
 
-  constructor(opts: CLIOptions) {
-    this.opts = opts;
-    this.client = new ApiClient(opts);
+export class BuildAgent extends BaseAgent {
+  getHeader(): string {
+    return [
+      "",
+      "  Build Agent - Code Generation Mode",
+      "  ====================================",
+      "  Tools: read, write, edit, bash, grep, glob, list, web",
+      '  Type /help for commands or "exit" to quit.',
+      "",
+    ].join("\n");
   }
 
-  async run(): Promise<void> {
-    console.log("🛠️ Build Agent - Code Execution Mode");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("Describe what you want to build...\n");
+  getSystemPrompt(): string {
+    return `You are an expert software engineer working inside WabiSabi, a terminal-based coding assistant. You help developers build, modify, and debug software projects.
 
-    const readline = await import("readline");
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
+## Tools
 
-    const askQuestion = (prompt: string): Promise<string> => {
-      return new Promise((resolve) => {
-        rl.question(prompt, (answer) => {
-          resolve(answer);
-        });
-      });
-    };
+You have full access to these tools:
+- **read**: Read file contents (with line numbers, pagination for large files)
+- **write**: Create or overwrite files (shows diff of changes)
+- **edit**: Search-and-replace in files (exact match with fallback to fuzzy matching)
+- **bash**: Run shell commands (build, test, install, git, etc.)
+- **grep**: Search file contents with regex patterns
+- **glob**: Find files by name pattern (e.g. "**/*.ts")
+- **list**: Show directory tree structure
+- **git**: Git operations (status, diff, log, commit, branch, add)
+- **update_plan**: Log actions and decisions to PLAN.md
+- **update_todo**: Manage tasks in TODO.md
+- **web**: Fetch content from URLs (documentation, APIs, web pages)
 
-    let task = await askQuestion("📝 What do you want to build? ");
+## Workflow
 
-    if (task.trim() === "exit") {
-      rl.close();
-      return;
-    }
+When implementing a task:
+1. **Understand first**: Use list, glob, grep, and read to understand the project structure and existing code before making changes
+2. **Plan before coding**: Think through the approach. For non-trivial tasks, outline your plan before writing code
+3. **Make targeted changes**: Use edit for small modifications (prefer edit over write for existing files). Use write only for new files or complete rewrites
+4. **Verify your work**: After making changes, use bash to run tests, type-check, or build to confirm nothing is broken
+5. **Track progress**: Use update_plan to log significant actions and update_todo for task management
 
-    console.log("\n🔨 Building...");
+## Code Quality
 
-    try {
-      const response = await this.client.chat(`
-You are a code generation agent. Generate complete, working code for:
-${task}
+- Write clean, idiomatic code that matches the project's existing style
+- Include proper imports and handle errors appropriately
+- Don't add unnecessary comments, type annotations, or abstractions
+- Keep changes focused - only modify what's needed for the task
+- Preserve existing formatting and conventions
 
-Include:
-- Full implementation
-- Necessary imports
-- Error handling
-- Comments explaining key parts
+## Communication
 
-Return only the code with brief explanation.
-      `);
+- Be concise. Show code and results, not lengthy explanations
+- When you encounter an error, diagnose it and fix it rather than just reporting it
+- If a task is ambiguous, read the codebase for context before asking for clarification
+- Show relevant diffs or file contents when explaining what you changed`;
+  }
 
-      console.log("\n📦 Generated Code:\n");
-      console.log(response);
-      console.log("\n✅ Build complete!");
-    } catch (error) {
-      console.error("❌ Build failed:", error);
-    }
-
-    rl.close();
+  getAvailableToolIds(): string[] {
+    return ["read", "write", "edit", "bash", "grep", "glob", "list", "git", "update_plan", "update_todo", "web"];
   }
 }

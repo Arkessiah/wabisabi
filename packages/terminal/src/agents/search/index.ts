@@ -1,66 +1,63 @@
-import { CLIOptions } from "../../clients/api-client.js";
-import { ApiClient } from "../../clients/api-client.js";
+/**
+ * Search Agent
+ *
+ * Read-only agent specialized in codebase exploration, finding code,
+ * tracing execution paths, and answering questions about a project.
+ */
 
-export class SearchAgent {
-  private client: ApiClient;
-  private opts: CLIOptions;
+import { BaseAgent } from "../base-agent.js";
 
-  constructor(opts: CLIOptions) {
-    this.opts = opts;
-    this.client = new ApiClient(opts);
+export class SearchAgent extends BaseAgent {
+  getHeader(): string {
+    return [
+      "",
+      "  Search Agent - Codebase Exploration Mode",
+      "  =========================================",
+      "  Tools: read, grep, glob, list, web (read-only)",
+      '  Type /help for commands or "exit" to quit.',
+      "",
+    ].join("\n");
   }
 
-  async run(): Promise<void> {
-    console.log("🔍 Search Agent - Research Mode");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("What do you want to research?\n");
+  getSystemPrompt(): string {
+    return `You are a codebase exploration expert working inside WabiSabi. You help developers understand code, find implementations, trace data flows, and answer questions about projects. You do NOT modify any files.
 
-    const readline = await import("readline");
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
+## Tools (read-only)
 
-    const askQuestion = (prompt: string): Promise<string> => {
-      return new Promise((resolve) => {
-        rl.question(prompt, (answer) => {
-          resolve(answer);
-        });
-      });
-    };
+- **read**: Read file contents with line numbers
+- **grep**: Search file contents with regex patterns
+- **glob**: Find files by name pattern
+- **list**: Show directory tree structure
+- **git**: Git info (use only: status, diff, log, branch)
+- **web**: Fetch content from URLs (documentation, APIs, web pages)
 
-    let query = await askQuestion("🔎 What to research? ");
+## How to Search
 
-    if (query.trim() === "exit") {
-      rl.close();
-      return;
-    }
+When asked to find or explain something:
 
-    console.log("\n🔬 Researching...");
+1. **Start broad**: Use list to see the project structure, then narrow down with glob and grep
+2. **Trace connections**: When you find a function or class, grep for its usages across the codebase to understand the full picture
+3. **Read for context**: Don't just show search results - read the relevant files to give meaningful explanations
+4. **Follow the chain**: If asked about data flow, trace from input to output through all layers
 
-    try {
-      const response = await this.client.chat(`
-You are a research agent. Find comprehensive information about:
-${query}
+## Response Format
 
-Include:
-1. Executive summary
-2. Key concepts and definitions
-3. Practical applications
-4. Relevant tools and technologies
-5. Best practices
-6. Resources for further learning
+- Always cite specific files and line numbers (e.g. "In src/utils/auth.ts:42")
+- Show relevant code snippets when they help explain
+- For architecture questions, describe the layers and how they connect
+- For "where is X" questions, list all locations with brief context
+- For "how does X work" questions, walk through the execution step by step
 
-Be thorough and informative.
-      `);
+## Search Strategy
 
-      console.log("\n📚 Research Results:\n");
-      console.log(response);
-      console.log("\n✅ Research complete!");
-    } catch (error) {
-      console.error("❌ Research failed:", error);
-    }
+- Use grep with regex for finding function calls, imports, type references
+- Use glob for finding files by extension or naming convention
+- Combine multiple searches to build a complete picture
+- When a search returns too many results, refine with more specific patterns
+- Always check both definitions AND usages of important symbols`;
+  }
 
-    rl.close();
+  getAvailableToolIds(): string[] {
+    return ["read", "grep", "glob", "list", "git", "web"];
   }
 }

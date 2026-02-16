@@ -7,19 +7,39 @@ import {
   AgentType,
   menuSystem,
   privacyManager,
-  pluginManager,
-  type PluginSource,
+  configManager,
+  toolRegistry,
+  sessionManager,
 } from "./services/index.js";
+import type { CLIOptions } from "./clients/api-client.js";
 
-interface CLIOptions {
-  substratum: string;
-  ollama: string;
-  model: string;
-  privacy: string;
-  allowFileRead: boolean;
-  allowFileWrite: boolean;
-  allowSystemCommands: boolean;
-}
+// Register all tools
+import { readTool } from "./tools/read.js";
+import { writeTool } from "./tools/write.js";
+import { editTool } from "./tools/edit.js";
+import { bashTool } from "./tools/bash.js";
+import { grepTool } from "./tools/grep.js";
+import { globTool } from "./tools/glob.js";
+import { listTool } from "./tools/list.js";
+import { updatePlanTool } from "./tools/update-plan.js";
+import { updateTodoTool } from "./tools/update-todo.js";
+import { gitTool } from "./tools/git.js";
+import { webTool } from "./tools/web.js";
+
+toolRegistry.register(readTool);
+toolRegistry.register(writeTool);
+toolRegistry.register(editTool);
+toolRegistry.register(bashTool);
+toolRegistry.register(grepTool);
+toolRegistry.register(globTool);
+toolRegistry.register(listTool);
+toolRegistry.register(updatePlanTool);
+toolRegistry.register(updateTodoTool);
+toolRegistry.register(gitTool);
+toolRegistry.register(webTool);
+
+// Load global config
+configManager.loadGlobal();
 
 const program = new Command();
 
@@ -32,6 +52,7 @@ program
   .option("--substratum <url>", "Substratum API URL", "http://localhost:3001")
   .option("--ollama <url>", "Ollama local URL", "http://localhost:11434")
   .option("--model <name>", "Model to use", "llama3.2")
+  .option("--api-key <key>", "API key (or set WABISABI_API_KEY env)")
   .option(
     "--privacy <level>",
     "Privacy level (local, hybrid, semi, full)",
@@ -49,34 +70,29 @@ program
   .command("interactive")
   .alias("i")
   .description(
-    "🚀 Start interactive mode (Tab to switch agents, Ctrl+P for menu)",
+    "🚀 Start interactive mode with the default agent",
   )
-  .action(async () => {
+  .option("--agent <type>", "Agent to use (build, plan, search)", "build")
+  .action(async (cmdOpts: { agent?: string }) => {
     const opts = program.opts() as CLIOptions;
-    console.clear();
-    console.log(`
-╔════════════════════════════════════════════════════════════╗
-║  🤖 WabiSabi CLI v1.0                                       ║
-║  ─────────────────────────────────────────────────────────── ║
-║  🎯 Tips:                                                   ║
-║     Tab → Switch agents (BUILD → PLAN → SEARCH)            ║
-║     Ctrl+P → Configuration menu                            ║
-║     Ctrl+C → Exit                                           ║
-║     Ctrl+L → Clear screen                                  ║
-╚════════════════════════════════════════════════════════════╝
-`);
+    const agentType = cmdOpts.agent || "build";
 
-    const currentAgent = agentSwitcher.getInfo();
-    console.log(
-      `👤 Current Agent: ${currentAgent.icon} [${currentAgent.label}] - ${currentAgent.description}`,
-    );
-    console.log(`🔒 Privacy: ${privacyManager.formatDisplay()}`);
-    console.log(`🎛️  Model: ${opts.model}`);
-    console.log(`🔗 Connected to: ${opts.substratum}`);
-    console.log("\n⏳ Interactive mode implementation pending...\n");
+    const agentMap: Record<string, () => Promise<any>> = {
+      build: () => import("./agents/build/index.js").then((m) => m.BuildAgent),
+      plan: () => import("./agents/plan/index.js").then((m) => m.PlanAgent),
+      search: () => import("./agents/search/index.js").then((m) => m.SearchAgent),
+    };
 
-    // Simulate agent change on Tab
-    console.log("💡 Try: agentSwitcher.cycle() to switch agents\n");
+    if (!agentMap[agentType]) {
+      console.error(`Unknown agent: ${agentType}`);
+      console.log(`Available: ${Object.keys(agentMap).join(", ")}`);
+      process.exit(1);
+    }
+
+    agentSwitcher.set(agentType as AgentType);
+    const AgentClass = await agentMap[agentType]();
+    const agent = new AgentClass(opts);
+    await agent.run();
   });
 
 // ═══════════════════════════════════════════════════════════════
@@ -114,8 +130,7 @@ program
   .command("agent <type>")
   .alias("a")
   .description("🤖 Run a specific agent (build, plan, search)")
-  .option("--task <task>", "Task description")
-  .action(async (type: AgentType, options: { task?: string }) => {
+  .action(async (type: AgentType) => {
     const opts = program.opts() as CLIOptions;
 
     const agentInfo = AGENTS.find((a) => a.type === type);
@@ -127,11 +142,16 @@ program
 
     agentSwitcher.set(type);
 
-    console.log(`🧠 WabiSabi Agent: ${agentInfo.icon} ${agentInfo.label}`);
-    console.log(`📋 Description: ${agentInfo.description}`);
-    console.log(`📝 Task: ${options.task || "default task"}`);
-    console.log(`🔗 Target: ${opts.substratum}`);
-    console.log(`🎛️  Privacy: ${privacyManager.formatDisplay()}`);
+    // Dynamic import and run the agent with tool-calling loop
+    const agentMap: Record<string, () => Promise<any>> = {
+      build: () => import("./agents/build/index.js").then((m) => m.BuildAgent),
+      plan: () => import("./agents/plan/index.js").then((m) => m.PlanAgent),
+      search: () => import("./agents/search/index.js").then((m) => m.SearchAgent),
+    };
+
+    const AgentClass = await agentMap[type]();
+    const agent = new AgentClass(opts);
+    await agent.run();
   });
 
 // ═══════════════════════════════════════════════════════════════
@@ -244,116 +264,16 @@ program
   );
 
 // ═══════════════════════════════════════════════════════════════
-// PLUGIN COMMANDS
+// PLUGIN COMMANDS (planned - not yet functional)
 // ═══════════════════════════════════════════════════════════════
 
 program
   .command("plugin")
-  .description("🔌 Manage plugins")
-  .command("add <source>")
-  .description("Install a plugin (GitHub repo, npm package, or local path)")
-  .action(async (source: string) => {
-    console.log(`📦 Installing plugin: ${source}`);
-
-    // Detectar tipo de fuente
-    let pluginSource: PluginSource;
-
-    if (source.includes("github.com") || source.includes("/")) {
-      pluginSource = { type: "github", repo: source };
-    } else if (source.startsWith("@")) {
-      pluginSource = { type: "npm", package: source };
-    } else {
-      pluginSource = { type: "local", path: source };
-    }
-
-    try {
-      await pluginManager.install(pluginSource);
-    } catch (error) {
-      console.error(`❌ Installation failed: ${error}`);
-    }
-  });
-
-program
-  .command("plugin list")
-  .alias("plugin ls")
-  .description("📋 List installed plugins")
+  .description("🔌 Manage plugins (coming soon)")
   .action(() => {
-    const plugins = pluginManager.list();
-    console.log("\n📦 Installed Plugins");
-    console.log("═".repeat(40));
-
-    if (plugins.length === 0) {
-      console.log("No plugins installed.");
-      console.log("💡 Install with: wabi plugin add <source>");
-    } else {
-      plugins.forEach((p) => {
-        const status = p.enabled ? "✓" : "✗";
-        console.log(`${status} ${p.manifest.name} v${p.manifest.version}`);
-        console.log(`   Type: ${p.manifest.type}`);
-        console.log(`   Description: ${p.manifest.description}`);
-      });
-    }
-  });
-
-program
-  .command("plugin show <name>")
-  .description("ℹ️ Show plugin details")
-  .action((name: string) => {
-    const plugin = pluginManager.show(name);
-    if (plugin) {
-      console.log(`\n📦 Plugin: ${plugin.manifest.name}`);
-      console.log("═".repeat(40));
-      console.log(`Version: ${plugin.manifest.version}`);
-      console.log(`Type: ${plugin.manifest.type}`);
-      console.log(`Description: ${plugin.manifest.description}`);
-      console.log(`Author: ${plugin.manifest.author}`);
-      console.log(`License: ${plugin.manifest.license}`);
-      console.log(`Enabled: ${plugin.enabled ? "Yes" : "No"}`);
-      console.log(`Loaded: ${plugin.loaded ? "Yes" : "No"}`);
-      console.log(`Installed: ${plugin.installedAt.toISOString()}`);
-      if (plugin.manifest.skills) {
-        console.log(`Skills: ${plugin.manifest.skills.length}`);
-      }
-    } else {
-      console.error(`❌ Plugin not found: ${name}`);
-    }
-  });
-
-program
-  .command("plugin enable <name>")
-  .description("✅ Enable a plugin")
-  .action((name: string) => pluginManager.enable(name));
-
-program
-  .command("plugin disable <name>")
-  .description("❌ Disable a plugin")
-  .action((name: string) => pluginManager.disable(name));
-
-program
-  .command("plugin remove <name>")
-  .alias("plugin rm")
-  .description("🗑️ Remove a plugin")
-  .action(async (name: string) => {
-    try {
-      await pluginManager.remove(name);
-    } catch (error) {
-      console.error(`❌ Remove failed: ${error}`);
-    }
-  });
-
-program
-  .command("plugin search <query>")
-  .description("🔍 Search for plugins")
-  .action(async (query: string) => {
-    const results = await pluginManager.search(query);
-    console.log(`\n🔍 Search results for "${query}":`);
-    if (results.length === 0) {
-      console.log("No results found.");
-    } else {
-      results.forEach((p) => {
-        console.log(`  - ${p.manifest.name} v${p.manifest.version}`);
-      });
-    }
+    console.log("\n🔌 Plugin system is planned for a future release.");
+    console.log("   Plugin types: tool, agent, theme, integration");
+    console.log("   Sources: GitHub, npm, local, URL\n");
   });
 
 // ═══════════════════════════════════════════════════════════════
@@ -361,26 +281,76 @@ program
 // ═══════════════════════════════════════════════════════════════
 
 program
-  .command("skills")
-  .alias("skill")
-  .description("🛠️ Manage skills")
-  .command("list")
-  .alias("ls")
-  .description("📋 List available skills")
+  .command("tools")
+  .alias("tool")
+  .description("🛠️ List available tools")
   .action(() => {
-    const skills = pluginManager.listSkills();
-    console.log("\n🛠️ Available Skills");
+    const tools = toolRegistry.list();
+    console.log("\n🛠️ Available Tools");
     console.log("═".repeat(40));
 
-    const defaultSkills = ["Read", "Write", "Bash", "Grep"];
-    console.log("Built-in Skills:");
-    defaultSkills.forEach((s) => console.log(`  📄 ${s}`));
+    for (const tool of tools) {
+      console.log(`  🔧 ${tool.id.padEnd(10)} ${tool.description.slice(0, 60)}`);
+    }
 
-    if (skills.length > 0) {
-      console.log("\nPlugin Skills:");
-      skills.forEach((s: any) =>
-        console.log(`  🔌 ${s.name}: ${s.description}`),
-      );
+    console.log(`\nTotal: ${tools.length} tools registered`);
+  });
+
+// ═══════════════════════════════════════════════════════════════
+// SESSION COMMANDS
+// ═══════════════════════════════════════════════════════════════
+
+program
+  .command("session")
+  .description("📂 Manage sessions")
+  .option("--list", "List recent sessions")
+  .option("--resume <id>", "Resume a session by ID")
+  .option("--delete <id>", "Delete a session by ID")
+  .action(async (options: { list?: boolean; resume?: string; delete?: string }) => {
+    if (options.list || (!options.resume && !options.delete)) {
+      const sessions = await sessionManager.listRecent();
+      console.log("\n📂 Recent Sessions");
+      console.log("═".repeat(60));
+
+      if (sessions.length === 0) {
+        console.log("No sessions found.");
+      } else {
+        for (const s of sessions) {
+          const date = new Date(s.updated).toLocaleString();
+          console.log(`  ${s.id}  ${s.title.slice(0, 30).padEnd(30)}  ${s.agent}  ${date}`);
+        }
+      }
+    }
+
+    if (options.resume) {
+      const session = await sessionManager.resume(options.resume);
+      if (!session) {
+        console.error(`Session not found: ${options.resume}`);
+        return;
+      }
+
+      // Launch the agent that was used in this session
+      const opts = program.opts() as CLIOptions;
+      const agentName = session.agent.replace("Agent", "").toLowerCase();
+      const agentMap: Record<string, () => Promise<any>> = {
+        build: () => import("./agents/build/index.js").then((m) => m.BuildAgent),
+        plan: () => import("./agents/plan/index.js").then((m) => m.PlanAgent),
+        search: () => import("./agents/search/index.js").then((m) => m.SearchAgent),
+      };
+
+      const loader = agentMap[agentName] || agentMap["build"];
+      const AgentClass = await loader();
+      const agent = new AgentClass(opts);
+      await agent.run(options.resume);
+    }
+
+    if (options.delete) {
+      const deleted = await sessionManager.deleteSession(options.delete);
+      if (deleted) {
+        console.log(`🗑️ Session deleted: ${options.delete}`);
+      } else {
+        console.error(`❌ Session not found: ${options.delete}`);
+      }
     }
   });
 
@@ -442,7 +412,7 @@ program
 ║                                                            ║
 ║  Status:                                                   ║
 ║    Agent: ${agentSwitcher.getInfo().label.padEnd(33)}║
-║    Plugins: ${pluginManager.list().length} installed                              ║
+║    Plugins: (coming soon)                                ║
 ║                                                            ║
 ║  Compatible with:                                          ║
 ║    ✅ Claude Code Skills                                  ║
@@ -454,7 +424,11 @@ program
 `);
   });
 
-// Parse arguments
+// Default to interactive mode when no subcommand
+if (process.argv.length <= 2) {
+  process.argv.push("interactive");
+}
+
 program.parse();
 
 export { program };

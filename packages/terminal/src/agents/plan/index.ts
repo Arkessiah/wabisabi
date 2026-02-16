@@ -1,65 +1,67 @@
-import { CLIOptions } from "../../clients/api-client.js";
-import { ApiClient } from "../../clients/api-client.js";
+/**
+ * Plan Agent
+ *
+ * Read-only agent specialized in analyzing codebases and creating
+ * detailed implementation plans. Cannot modify files.
+ */
 
-export class PlanAgent {
-  private client: ApiClient;
-  private opts: CLIOptions;
+import { BaseAgent } from "../base-agent.js";
 
-  constructor(opts: CLIOptions) {
-    this.opts = opts;
-    this.client = new ApiClient(opts);
+export class PlanAgent extends BaseAgent {
+  getHeader(): string {
+    return [
+      "",
+      "  Plan Agent - Architecture & Planning Mode",
+      "  ==========================================",
+      "  Tools: read, grep, glob, list (read-only)",
+      '  Type /help for commands or "exit" to quit.',
+      "",
+    ].join("\n");
   }
 
-  async run(): Promise<void> {
-    console.log("📊 Plan Agent - Task Planning Mode");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("Describe the task you want to plan...\n");
+  getSystemPrompt(): string {
+    return `You are a senior software architect working inside WabiSabi. You analyze codebases and create detailed implementation plans. You do NOT modify any files.
 
-    const readline = await import("readline");
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
+## Tools (read-only)
 
-    const askQuestion = (prompt: string): Promise<string> => {
-      return new Promise((resolve) => {
-        rl.question(prompt, (answer) => {
-          resolve(answer);
-        });
-      });
-    };
+- **read**: Read file contents with line numbers
+- **grep**: Search file contents with regex patterns
+- **glob**: Find files by name pattern
+- **list**: Show directory tree structure
+- **git**: Git info (use only: status, diff, log, branch)
 
-    let task = await askQuestion("📋 What do you want to plan? ");
+## How to Plan
 
-    if (task.trim() === "exit") {
-      rl.close();
-      return;
-    }
+When asked to plan a feature or change:
 
-    console.log("\n📈 Planning...");
+1. **Explore the codebase**: Use list to understand overall structure, glob to find relevant files, grep to locate patterns, and read to understand implementations
+2. **Identify the scope**: What files need to change? What new files are needed? What dependencies exist?
+3. **Create a structured plan** with:
+   - **Goal**: One-sentence summary of what we're building
+   - **Files to modify**: Existing files that need changes, with what changes
+   - **Files to create**: New files needed, with their purpose and key contents
+   - **Implementation order**: Ordered steps respecting dependencies
+   - **Risks**: Potential issues and how to mitigate them
+   - **Verification**: How to test that the implementation works
 
-    try {
-      const response = await this.client.chat(`
-You are a planning agent. Create a detailed plan for:
-${task}
+## Output Format
 
-Include:
-1. High-level overview
-2. Step-by-step tasks
-3. Dependencies between tasks
-4. Estimated effort for each step
-5. Potential risks and mitigations
+Structure your plans clearly with markdown:
+- Use numbered steps for implementation order
+- Use code blocks for key interfaces or signatures
+- Be specific about file paths and function names
+- Estimate relative complexity per step (simple/moderate/complex)
 
-Format as a structured plan with numbered steps.
-      `);
+## Key Principles
 
-      console.log("\n📋 Generated Plan:\n");
-      console.log(response);
-      console.log("\n✅ Planning complete!");
-    } catch (error) {
-      console.error("❌ Planning failed:", error);
-    }
+- Always read relevant code before making recommendations
+- Consider existing patterns and conventions in the project
+- Prefer minimal changes that achieve the goal
+- Identify breaking changes and migration needs
+- Think about edge cases and error scenarios`;
+  }
 
-    rl.close();
+  getAvailableToolIds(): string[] {
+    return ["read", "grep", "glob", "list", "git"];
   }
 }
