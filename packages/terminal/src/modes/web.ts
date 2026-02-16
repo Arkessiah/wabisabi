@@ -120,12 +120,26 @@ export async function webMode(opts: CLIOptions, port = 3333): Promise<void> {
   function spawnChild() {
     const args = ["run", entryScript, "interactive",
       "--substratum", opts.substratum, "--ollama", opts.ollama, "--model", opts.model];
-    if (opts.apiKey) args.push("--api-key", opts.apiKey);
+    // Security (ALTA-3): API key via env var REMOVED - no longer pass via CLI args
     if (opts.privacy) args.push("--privacy", opts.privacy);
 
+    // Security (ALTA-3): Pass API key via env var, not CLI args
+    // CLI args are visible in ps/top output and system logs
+    const childEnv: Record<string, string> = {
+      ...process.env,
+      FORCE_COLOR: "1",
+      TERM: "xterm-256color",
+    };
+    if (opts.apiKey) {
+      childEnv.WABISABI_API_KEY = opts.apiKey;
+    }
+
     const child = Bun.spawn(["bun", ...args], {
-      cwd: projectRoot, stdin: "pipe", stdout: "pipe", stderr: "pipe",
-      env: { ...process.env, FORCE_COLOR: "1", TERM: "xterm-256color" },
+      cwd: projectRoot,
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: childEnv,
     });
     children.add(child);
     return child;
