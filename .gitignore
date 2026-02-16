@@ -148,6 +148,7 @@ BASE/
 !README.md
 !SECURITY.md
 !.github/*.md
+!PRODUCTION_ROADMAP.md
 AGENTS.md
 PLAN.md
 TODO.md
