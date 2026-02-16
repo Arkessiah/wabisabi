@@ -42,3 +42,100 @@ If the report is accepted, we will:
 - Credit the reporter (if desired)
 
 We appreciate responsible disclosure.
+
+---
+
+## Security por Paquete
+
+Cada paquete mantiene su propio SECURITY.md con detecciones especificas:
+
+| Paquete | Riesgo | Dependencias | SECURITY.md |
+|---------|--------|-------------|-------------|
+| @wabisabi/terminal | Alto | ws, zod, chalk, commander | [packages/terminal/SECURITY.md](packages/terminal/SECURITY.md) |
+| @wabisabi/auth | Alto | openid-client, jsonwebtoken, bcryptjs | [packages/auth/SECURITY.md](packages/auth/SECURITY.md) |
+| @wabisabi/plugins | Medio | Ninguna (riesgo en plugins de terceros) | [packages/plugins/SECURITY.md](packages/plugins/SECURITY.md) |
+| @wabisabi/admin | Bajo | Ninguna | [packages/admin/SECURITY.md](packages/admin/SECURITY.md) |
+
+## Dependabot
+
+GitHub Dependabot debe estar activado para este repositorio:
+
+1. **Settings > Code security and analysis > Dependabot alerts**: Activar
+2. **Dependabot security updates**: Activar
+3. **Dependabot version updates**: Configurar en `.github/dependabot.yml`
+
+Las alertas de Dependabot se documentan en el SECURITY.md de cada paquete afectado.
+
+## Plan de Revision Semanal de Seguridad
+
+### Frecuencia: Cada lunes
+
+El agente de seguridad de WabiSabi ejecutara automaticamente una revision semanal que incluye:
+
+### 1. Dependencias y CVEs
+- Revisar alertas de Dependabot en GitHub Security tab
+- Ejecutar `bun audit` / `npm audit` en cada paquete
+- Verificar versiones actuales vs ultimas estables
+- Merge PRs de Dependabot que pasen tests (patch/minor)
+- Evaluar major updates con breaking changes
+
+### 2. Codigo
+- Scan de secretos expuestos (API keys, tokens, passwords)
+- Revision de nuevos archivos por vulnerabilidades comunes
+- Verificar permisos de archivos sensibles (auth, config)
+- Comprobar sanitizacion de inputs en tools y endpoints
+
+### 3. Infraestructura
+- Verificar que el servidor web solo escucha en localhost
+- Comprobar cifrado de credenciales at-rest
+- Revisar logs de acceso si disponibles
+- Verificar integridad de plugins instalados
+
+### 4. Documentacion
+- Actualizar SECURITY.md de cada paquete con hallazgos
+- Registrar acciones tomadas en historial de revisiones
+- Notificar al usuario de issues pendientes
+
+### Notificaciones
+
+El agente avisara al usuario cada lunes con:
+- Resumen de alertas de Dependabot activas
+- Dependencias desactualizadas
+- Vulnerabilidades detectadas en codigo
+- Acciones recomendadas priorizadas por severidad
+
+## Historial de Revisiones Globales
+
+| Fecha | Paquetes revisados | Hallazgos | Acciones |
+|-------|-------------------|-----------|----------|
+| 2026-02-16 | Todos (terminal, auth, plugins, admin) | **2 CRITICAS**, 5 ALTAS, 5 MEDIAS, 7 BAJAS | Ver SECURITY.md de cada paquete para detalles |
+
+## Resumen Ejecutivo del Audit Inicial (2026-02-16)
+
+### Hallazgos Críticos (Acción Inmediata Requerida)
+
+1. **@wabisabi/plugins** - Arbitrary code execution via `import(pluginPath)` sin validación
+   - **Riesgo**: Código malicioso puede ejecutarse con privilegios completos
+   - **Acción**: NO USAR sistema de plugins hasta implementar sandboxing
+
+2. **@wabisabi/auth** - Session tokens almacenados en plaintext sin cifrado
+   - **Riesgo**: Cualquier proceso local puede robar access/refresh tokens
+   - **Acción**: Implementar cifrado AES-256-GCM + permisos 0o600
+
+### Top 5 Prioridades de Fix
+
+1. **Plugin sandboxing** (packages/plugins) - Path validation, integrity checks, Workers
+2. **Auth encryption** (packages/auth) - Cifrar session.json
+3. **Web server hardening** (packages/terminal) - Bind 127.0.0.1, auth token, Origin validation
+4. **File tool containment** (packages/terminal) - Validar paths dentro de projectRoot
+5. **Grep shell injection** (packages/terminal) - Usar execFileSync en vez de execSync
+
+### Dependencias con CVEs
+
+- **ws ^8.16.0** (terminal) - CVE-2024-37890 (DoS) → Actualizar a >=8.17.1
+
+### Estadísticas
+
+- **Archivos auditados**: 20+ archivos de código crítico
+- **Severidad**: 2 CRITICAS, 5 ALTAS, 5 MEDIAS, 7 BAJAS
+- **Frameworks OWASP**: A01 (Access Control), A02 (Crypto), A03 (Injection), A07 (Auth), A08 (Integrity)

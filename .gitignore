@@ -146,6 +146,7 @@ BASE/
 # Documentation (local planning files - never commit)
 *.md
 !README.md
+!SECURITY.md
 AGENTS.md
 PLAN.md
 TODO.md
