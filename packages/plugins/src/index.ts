@@ -45,6 +45,7 @@ export interface Logger {
 
 export class PluginManager {
   private plugins: Map<string, Plugin> = new Map();
+  private workers: Map<string, Worker> = new Map();
   private context: PluginContext;
 
   constructor() {
@@ -108,34 +109,66 @@ export class PluginManager {
         );
       }
 
-      // Step 5: Import plugin (only after all validations pass)
-      const pluginModule = await import(entryPath);
-      const plugin = pluginModule.default || pluginModule.plugin;
+      // Step 5: Load plugin in sandboxed Worker (CRITICA-2)
+      // Security: Executes plugin code in isolated process with restricted permissions
+      const workerPath = new URL("./worker.ts", import.meta.url).pathname;
+      const worker = new Worker(workerPath);
 
-      if (!plugin) {
-        throw new Error(`No plugin export found in ${entryPath}`);
-      }
+      // Wait for plugin to load in worker
+      const loadResult = await new Promise<{ plugin: Plugin; error?: string }>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Plugin load timeout after 10 seconds"));
+        }, 10000);
+
+        worker.onmessage = (event: MessageEvent) => {
+          clearTimeout(timeout);
+          const { type, plugin, error, message, level } = event.data;
+
+          if (type === "loaded") {
+            resolve({ plugin });
+          } else if (type === "error") {
+            reject(new Error(error));
+          } else if (type === "log") {
+            // Forward logs from worker
+            if (level === "info") console.log(`[Plugin] ${message}`);
+            else if (level === "error") console.error(`[Plugin] ${message}`);
+            else if (level === "warn") console.warn(`[Plugin] ${message}`);
+          }
+        };
+
+        worker.onerror = (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        };
+
+        // Send load command to worker
+        worker.postMessage({
+          type: "load_plugin",
+          pluginPath: entryPath,
+          manifest,
+        });
+      });
 
       // Verify plugin metadata matches manifest
-      if (plugin.name !== manifest.name) {
+      if (loadResult.plugin.name !== manifest.name) {
+        worker.terminate();
         throw new Error(
-          `Plugin name mismatch: manifest declares "${manifest.name}" but plugin exports "${plugin.name}"`
+          `Plugin name mismatch: manifest declares "${manifest.name}" but plugin exports "${loadResult.plugin.name}"`
         );
       }
-      if (plugin.version !== manifest.version) {
+      if (loadResult.plugin.version !== manifest.version) {
+        worker.terminate();
         throw new Error(
-          `Plugin version mismatch: manifest declares "${manifest.version}" but plugin exports "${plugin.version}"`
+          `Plugin version mismatch: manifest declares "${manifest.version}" but plugin exports "${loadResult.plugin.version}"`
         );
       }
 
-      // Step 6: Register plugin
-      this.plugins.set(plugin.name, plugin);
-      console.log(`[Plugin] Loaded: ${plugin.name} v${plugin.version} (verified)`);
-
-      // Step 7: Call onLoad hook
-      if (plugin.onLoad) {
-        await plugin.onLoad(this.context);
-      }
+      // Step 6: Register plugin and worker
+      this.plugins.set(loadResult.plugin.name, loadResult.plugin);
+      this.workers.set(loadResult.plugin.name, worker);
+      console.log(
+        `[Plugin] Loaded: ${loadResult.plugin.name} v${loadResult.plugin.version} (sandboxed)`
+      );
     } catch (error) {
       console.error(`[Plugin] Failed to load ${pluginPath}:`, error);
       throw error; // Re-throw to prevent silent failures
@@ -144,13 +177,31 @@ export class PluginManager {
 
   async unloadPlugin(name: string): Promise<void> {
     const plugin = this.plugins.get(name);
+    const worker = this.workers.get(name);
+
     if (!plugin) {
       console.warn(`[Plugin] Not found: ${name}`);
       return;
     }
 
-    if (plugin.onUnload) {
-      await plugin.onUnload(this.context);
+    // Signal worker to run onUnload hook
+    if (worker) {
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(resolve, 5000); // Max 5s for cleanup
+
+        worker.onmessage = (event: MessageEvent) => {
+          if (event.data.type === "unloaded") {
+            clearTimeout(timeout);
+            resolve();
+          }
+        };
+
+        worker.postMessage({ type: "unload" });
+      });
+
+      // Terminate worker
+      worker.terminate();
+      this.workers.delete(name);
     }
 
     this.plugins.delete(name);
