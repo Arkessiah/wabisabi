@@ -1,0 +1,114 @@
+# Dependabot configuration for WabiSabi monorepo
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Terminal package (Bun dependencies)
+  - package-ecosystem: "npm"
+    directory: "/packages/terminal"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Madrid"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Arkessiah"
+    labels:
+      - "dependencies"
+      - "security"
+    commit-message:
+      prefix: "chore(terminal)"
+      include: "scope"
+    # Group minor and patch updates
+    groups:
+      production-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      # Security updates always separate
+      security-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
+
+  # Auth package
+  - package-ecosystem: "npm"
+    directory: "/packages/auth"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Madrid"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Arkessiah"
+    labels:
+      - "dependencies"
+      - "security"
+    commit-message:
+      prefix: "chore(auth)"
+      include: "scope"
+    groups:
+      production-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Admin package
+  - package-ecosystem: "npm"
+    directory: "/packages/admin"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Madrid"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Arkessiah"
+    labels:
+      - "dependencies"
+      - "security"
+    commit-message:
+      prefix: "chore(admin)"
+      include: "scope"
+
+  # Plugins package
+  - package-ecosystem: "npm"
+    directory: "/packages/plugins"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Madrid"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Arkessiah"
+    labels:
+      - "dependencies"
+      - "security"
+    commit-message:
+      prefix: "chore(plugins)"
+      include: "scope"
+
+  # GitHub Actions (if any)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Madrid"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "Arkessiah"
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "chore(ci)"

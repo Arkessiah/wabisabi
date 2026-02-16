@@ -147,6 +147,7 @@ BASE/
 *.md
 !README.md
 !SECURITY.md
+!.github/*.md
 AGENTS.md
 PLAN.md
 TODO.md
