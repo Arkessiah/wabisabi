@@ -12,7 +12,9 @@
 import { spawn } from "child_process";
 import { performance } from "perf_hooks";
 import { writeFileSync } from "fs";
-import { resolve } from "path";
+import { resolve as resolvePath } from "path";
+
+const BUN = process.execPath; // Use the current bun binary
 
 interface BenchmarkResult {
   name: string;
@@ -43,12 +45,12 @@ const TARGETS = {
 };
 
 async function measureColdStart(): Promise<BenchmarkResult> {
-  const entryPoint = resolve(__dirname, "../packages/terminal/dist/index.js");
+  const entryPoint = resolvePath(__dirname, "../packages/terminal/dist/index.js");
   
   const start = performance.now();
   
   return new Promise((resolve) => {
-    const proc = spawn("bun", [entryPoint, "--version"], {
+    const proc = spawn(BUN, [entryPoint, "--version"], {
       stdio: "pipe",
     });
     
@@ -103,10 +105,10 @@ async function measureToolOverhead(): Promise<BenchmarkResult> {
 }
 
 async function measureMemoryFootprint(): Promise<BenchmarkResult[]> {
-  const entryPoint = resolve(__dirname, "../packages/terminal/dist/index.js");
+  const entryPoint = resolvePath(__dirname, "../packages/terminal/dist/index.js");
   
   return new Promise((resolve) => {
-    const proc = spawn("bun", [entryPoint, "interactive"], {
+    const proc = spawn(BUN, [entryPoint, "interactive"], {
       stdio: "pipe",
       env: { ...process.env, NODE_ENV: "production" },
     });
@@ -221,8 +223,8 @@ async function measureTestSuite(): Promise<BenchmarkResult> {
   const start = performance.now();
   
   return new Promise((resolve) => {
-    const proc = spawn("bun", ["test"], {
-      cwd: resolve(__dirname, "../packages/terminal"),
+    const proc = spawn(BUN, ["test"], {
+      cwd: resolvePath(__dirname, "../packages/terminal"),
       stdio: "pipe",
     });
     
@@ -311,7 +313,7 @@ async function runBenchmarks(): Promise<BenchmarkReport> {
 runBenchmarks()
   .then((report) => {
     // Save report
-    const reportPath = resolve(__dirname, "report.json");
+    const reportPath = resolvePath(__dirname, "report.json");
     writeFileSync(reportPath, JSON.stringify(report, null, 2));
     console.log(`📄 Report saved to: ${reportPath}\n`);
     

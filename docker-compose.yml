@@ -1,5 +1,4 @@
 # WabiSabi Terminal with Ollama - Docker Compose
-version: '3.8'
 
 services:
   # ── Ollama LLM Server ──────────────────────────────────────────
