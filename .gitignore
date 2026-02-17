@@ -158,6 +158,9 @@ PLAN.md
 TODO.md
 *.md.bak
 
+# Benchmark reports (generated)
+benchmarks/report.json
+
 # Local services files
 packages/terminal/src/services/
 
