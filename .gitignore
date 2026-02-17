@@ -161,7 +161,3 @@ TODO.md
 # Benchmark reports (generated)
 benchmarks/report.json
 
-# Local services files
-packages/terminal/src/services/
-
-
