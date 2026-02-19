@@ -9,6 +9,7 @@
 import type { ToolSpec } from "../tools/index.js";
 import type { ProvidersConfig } from "../config/schema.js";
 import { OllamaCluster, type ClusterNodeStatus } from "./ollama-cluster.js";
+import { authManager } from "../auth/index.js";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -240,9 +241,10 @@ export class ApiClient {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3000);
+      const headers = await this.getHeaders();
       const res = await fetch(`${this.substratumUrl}/v1/models`, {
         signal: controller.signal,
-        headers: this.getHeaders(),
+        headers,
       });
       clearTimeout(timeout);
       if (res.ok) {
@@ -264,9 +266,10 @@ export class ApiClient {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3000);
+      const headers = await this.getHeaders();
       const res = await fetch(`${this.substratumUrl}/v1/models`, {
         signal: controller.signal,
-        headers: this.getHeaders(),
+        headers,
       });
       clearTimeout(timeout);
       if (res.ok) {
@@ -318,13 +321,26 @@ export class ApiClient {
     this.ollamaCluster.destroy();
   }
 
-  private getHeaders(): Record<string, string> {
+  private async getHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
-    if (this.apiKey) {
+
+    // 1. Try authManager (JWT with auto-refresh / API key)
+    const authHeaders = await authManager.getAuthHeaders();
+    if (Object.keys(authHeaders).length > 0) {
+      Object.assign(headers, authHeaders);
+    } else if (this.apiKey) {
+      // 2. Fallback to constructor apiKey
       headers["Authorization"] = `Bearer ${this.apiKey}`;
     }
+
+    // 3. Add session ID if available (Substratum terminal endpoints)
+    const sessionId = authManager.getSessionId();
+    if (sessionId) {
+      headers["X-Session-ID"] = sessionId;
+    }
+
     return headers;
   }
 
@@ -396,11 +412,12 @@ export class ApiClient {
 
   async chat(prompt: string): Promise<string> {
     const url = await this.getProviderUrl();
+    const headers = await this.getHeaders();
     const response = await this.fetchRetry(
       url,
       {
         method: "POST",
-        headers: this.getHeaders(),
+        headers,
         body: JSON.stringify({
           model: this.model,
           messages: [{ role: "user", content: prompt }],
@@ -433,11 +450,12 @@ export class ApiClient {
 
     try {
       const url = await this.getProviderUrl();
+      const headers = await this.getHeaders();
       const response = await this.fetchRetry(
         url,
         {
           method: "POST",
-          headers: this.getHeaders(),
+          headers,
           body: JSON.stringify(body),
         },
       );
@@ -497,11 +515,12 @@ export class ApiClient {
     }
 
     const url = await this.getProviderUrl();
+    const headers = await this.getHeaders();
     const response = await this.fetchRetry(
       url,
       {
         method: "POST",
-        headers: this.getHeaders(),
+        headers,
         body: JSON.stringify(body),
       },
       1, // Only 1 retry for streaming
@@ -636,6 +655,28 @@ export class ApiClient {
     if (node) this.ollamaCluster.reportSuccess(node.name);
     const data = await response.json();
     return data.response || "No response";
+  }
+
+  async getBillingInfo(): Promise<{ tokensUsed: number; tokensRemaining: number; dailyLimit: number } | null> {
+    try {
+      const headers = await this.getHeaders();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(`${this.substratumUrl}/v1/billing`, {
+        signal: controller.signal,
+        headers,
+      });
+      clearTimeout(timeout);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return {
+        tokensUsed: data.tokensUsed ?? 0,
+        tokensRemaining: data.tokensRemaining ?? 0,
+        dailyLimit: data.dailyLimit ?? 0,
+      };
+    } catch {
+      return null;
+    }
   }
 
   async listModels(): Promise<string[]> {

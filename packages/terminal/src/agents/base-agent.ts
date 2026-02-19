@@ -982,7 +982,7 @@ export abstract class BaseAgent {
   async run(resumeSessionId?: string): Promise<void> {
     // Onboarding on first run
     if (isFirstRun()) {
-      await runOnboarding(this.opts.substratum, this.opts.ollama);
+      await runOnboarding();
     }
 
     console.log(this.getHeader());

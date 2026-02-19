@@ -23,6 +23,7 @@ import {
   getOrCreateEncryptionKey,
 } from "../utils/keychain.js";
 
+import { configManager } from "../config/index.js";
 import { AuthConfigSchema, type AuthConfig, type AuthProvider, type DeviceCodeResponse } from "./schema.js";
 import { decodeJwt, isExpired, needsRefresh } from "./token.js";
 
@@ -222,7 +223,54 @@ export class AuthManager {
     return this.config ? { ...this.config } : null;
   }
 
+  /**
+   * Return the stored session ID (from /terminal/auth/login).
+   */
+  getSessionId(): string | null {
+    return this.config?.sessionId ?? null;
+  }
+
+  /**
+   * Login via Substratum terminal endpoint (email/password).
+   * POST /terminal/auth/login → { token, sessionId, expiresIn }
+   */
+  async loginTerminal(email: string, password: string): Promise<boolean> {
+    const baseUrl = this.getSubstratumUrl();
+    try {
+      const res = await fetch(`${baseUrl}/terminal/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: email, password, cliVersion: "1.0.0" }),
+      });
+      if (!res.ok) return false;
+      const data = (await res.json()) as Record<string, unknown>;
+      if (typeof data.token !== "string") return false;
+
+      const payload = decodeJwt(data.token);
+      this.config = {
+        provider: "substratum",
+        accessToken: data.token,
+        sessionId: typeof data.sessionId === "string" ? data.sessionId : undefined,
+        expiresAt: payload?.exp,
+        userId: typeof payload?.sub === "string" ? payload.sub : undefined,
+        email,
+      };
+      this.save();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // ── Internal ───────────────────────────────────────────────
+
+  private getSubstratumUrl(): string {
+    try {
+      return configManager.getProviders().substratum.url;
+    } catch {
+      return process.env.SUBSTRATUM_URL ?? "https://api.substratum.dev";
+    }
+  }
 
   private getApiKeyFallback(): string | null {
     return process.env.WABISABI_API_KEY ?? process.env.SUBSTRATUM_API_KEY ?? null;
@@ -233,7 +281,7 @@ export class AuthManager {
     const endpoint =
       this.config.provider === "github"
         ? "https://github.com/login/oauth/access_token"
-        : `${process.env.SUBSTRATUM_URL ?? "http://localhost:3001"}/auth/token`;
+        : `${this.getSubstratumUrl()}/auth/refresh`;
 
     try {
       const res = await fetch(endpoint, {
@@ -261,12 +309,12 @@ export class AuthManager {
     const codeEndpoint =
       provider === "github"
         ? "https://github.com/login/device/code"
-        : `${process.env.SUBSTRATUM_URL ?? "http://localhost:3001"}/auth/device/code`;
+        : `${this.getSubstratumUrl()}/auth/device/code`;
 
     const tokenEndpoint =
       provider === "github"
         ? "https://github.com/login/oauth/access_token"
-        : `${process.env.SUBSTRATUM_URL ?? "http://localhost:3001"}/auth/device/token`;
+        : `${this.getSubstratumUrl()}/auth/device/token`;
 
     // Step 1: Request device code
     const codeRes = await fetch(codeEndpoint, {
@@ -320,6 +368,7 @@ export class AuthManager {
             expiresAt: payload?.exp,
             userId: typeof payload?.sub === "string" ? payload.sub : undefined,
             email: typeof payload?.email === "string" ? payload.email : undefined,
+            sessionId: typeof tokenData.session_id === "string" ? tokenData.session_id : undefined,
           };
           this.save();
           return true;

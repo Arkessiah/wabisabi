@@ -118,13 +118,11 @@ export async function webMode(opts: CLIOptions, port = 3333): Promise<void> {
   console.log(`\n🔐 Session token: ${sessionToken}\n⚠️  Server will ONLY accept connections from localhost\n`);
 
   function spawnChild() {
-    const args = ["run", entryScript, "interactive",
-      "--substratum", opts.substratum, "--ollama", opts.ollama, "--model", opts.model];
-    // Security (ALTA-3): API key via env var REMOVED - no longer pass via CLI args
+    const args = ["run", entryScript, "interactive", "--model", opts.model];
+    if (opts.provider) args.push("--provider", opts.provider);
     if (opts.privacy) args.push("--privacy", opts.privacy);
 
-    // Security (ALTA-3): Pass API key via env var, not CLI args
-    // CLI args are visible in ps/top output and system logs
+    // Security (ALTA-3): Pass sensitive values via env, not CLI args
     const childEnv: Record<string, string> = {
       ...process.env,
       FORCE_COLOR: "1",
@@ -132,6 +130,10 @@ export async function webMode(opts: CLIOptions, port = 3333): Promise<void> {
     };
     if (opts.apiKey) {
       childEnv.WABISABI_API_KEY = opts.apiKey;
+    }
+    // Pass Substratum URL so child process inherits provider config
+    if (opts.providers?.substratum?.url) {
+      childEnv.SUBSTRATUM_URL = opts.providers.substratum.url;
     }
 
     const child = Bun.spawn(["bun", ...args], {

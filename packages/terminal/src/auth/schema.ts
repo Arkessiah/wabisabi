@@ -17,6 +17,7 @@ export const AuthConfigSchema = z.object({
   expiresAt: z.number().optional(),
   userId: z.string().optional(),
   email: z.string().email().optional(),
+  sessionId: z.string().optional(),
 });
 
 export const DeviceCodeResponseSchema = z.object({

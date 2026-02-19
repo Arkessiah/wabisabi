@@ -519,6 +519,114 @@ program
 `);
   });
 
+// ═══════════════════════════════════════════════════════════════
+// AUTH & BILLING
+// ═══════════════════════════════════════════════════════════════
+
+program
+  .command("login")
+  .description("🔑 Login to Substratum")
+  .option("--device", "Use OAuth device-code flow instead of email/password")
+  .action(async (cmdOpts: { device?: boolean }) => {
+    const { authManager } = await import("./auth/index.js");
+
+    if (cmdOpts.device) {
+      console.log("Starting OAuth device-code flow...\n");
+      const ok = await authManager.login("substratum");
+      if (ok) {
+        console.log("\n✅ Authenticated via device-code flow");
+      } else {
+        console.error("\n❌ Authentication failed");
+        process.exit(1);
+      }
+      return;
+    }
+
+    // Interactive email/password login
+    const readline = await import("readline");
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const ask = (q: string): Promise<string> => new Promise((r) => rl.question(q, r));
+
+    try {
+      const email = await ask("Email: ");
+      // Hide password input
+      process.stdout.write("Password: ");
+      const password = await new Promise<string>((resolve) => {
+        let pw = "";
+        process.stdin.setRawMode?.(true);
+        process.stdin.resume();
+        process.stdin.on("data", function handler(ch: Buffer) {
+          const c = ch.toString();
+          if (c === "\n" || c === "\r") {
+            process.stdin.setRawMode?.(false);
+            process.stdin.removeListener("data", handler);
+            process.stdout.write("\n");
+            resolve(pw);
+          } else if (c === "\x7f" || c === "\b") {
+            if (pw.length > 0) pw = pw.slice(0, -1);
+          } else if (c === "\x03") {
+            process.exit(0);
+          } else {
+            pw += c;
+          }
+        });
+      });
+
+      const ok = await authManager.loginTerminal(email, password);
+      if (ok) {
+        console.log("✅ Authenticated successfully");
+        const config = authManager.getConfig();
+        if (config?.sessionId) console.log(`   Session: ${config.sessionId}`);
+      } else {
+        console.error("❌ Invalid credentials");
+        process.exit(1);
+      }
+    } finally {
+      rl.close();
+    }
+  });
+
+program
+  .command("logout")
+  .description("🚪 Logout and clear stored credentials")
+  .action(async () => {
+    const { authManager } = await import("./auth/index.js");
+    authManager.logout();
+    console.log("✅ Logged out - credentials cleared");
+  });
+
+program
+  .command("billing")
+  .description("💰 Show token usage and billing info")
+  .action(async () => {
+    const opts = resolveOptions(program.opts() as CLIOptions);
+    const { ApiClient } = await import("./clients/api-client.js");
+    const client = new ApiClient(opts);
+
+    console.log("Fetching billing info...\n");
+    const billing = await client.getBillingInfo();
+    client.destroy();
+
+    if (!billing) {
+      console.error("❌ Could not fetch billing info. Are you logged in?");
+      console.log("   Run: wabisabi login");
+      process.exit(1);
+    }
+
+    const pct = billing.dailyLimit > 0
+      ? ((billing.tokensUsed / billing.dailyLimit) * 100).toFixed(1)
+      : "0";
+
+    console.log(`╔══════════════════════════════════════╗`);
+    console.log(`║  💰 Billing & Usage                  ║`);
+    console.log(`╠══════════════════════════════════════╣`);
+    console.log(`║  Tokens used:      ${String(billing.tokensUsed).padEnd(17)}║`);
+    console.log(`║  Tokens remaining: ${String(billing.tokensRemaining).padEnd(17)}║`);
+    console.log(`║  Daily limit:      ${String(billing.dailyLimit).padEnd(17)}║`);
+    console.log(`║  Usage:            ${(pct + "%").padEnd(17)}║`);
+    console.log(`╚══════════════════════════════════════╝`);
+  });
+
 program
   .command("info")
   .alias("about")
