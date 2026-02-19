@@ -2,9 +2,12 @@
  * WabiSabi Configuration Schemas
  *
  * Zod schemas for global and project-level configuration.
+ * Supports both legacy (flat strings) and new (providers object) formats.
  */
 
 import { z } from "zod";
+
+// ── Tool Permissions ───────────────────────────────────────────
 
 export const ToolPermissionsSchema = z.object({
   allowFileRead: z.boolean().default(true),
@@ -15,11 +18,43 @@ export const ToolPermissionsSchema = z.object({
   allowList: z.boolean().default(true),
 });
 
+// ── Provider Schemas ───────────────────────────────────────────
+
+export const OllamaNodeSchema = z.object({
+  name: z.string(),
+  url: z.string(),
+  gpu: z.enum(["nvidia", "amd", "metal", "cpu"]).optional(),
+  priority: z.number().min(1).max(10).default(5),
+});
+
+export const OllamaProviderSchema = z.object({
+  mode: z.enum(["local", "cluster"]).default("local"),
+  nodes: z.array(OllamaNodeSchema).default([
+    { name: "local", url: "http://localhost:11434", priority: 5 },
+  ]),
+});
+
+export const SubstratumProviderSchema = z.object({
+  enabled: z.boolean().default(false),
+  url: z.string().default("https://api.substratum.dev"),
+  apiKey: z.string().optional(),
+});
+
+export const ProvidersSchema = z.object({
+  substratum: SubstratumProviderSchema.default({}),
+  ollama: OllamaProviderSchema.default({}),
+});
+
+// ── Global Config ──────────────────────────────────────────────
+
 export const GlobalConfigSchema = z.object({
   model: z.string().default("llama3.2"),
-  substratum: z.string().default("http://localhost:3001"),
-  ollama: z.string().default("http://localhost:11434"),
+  // Legacy fields (backward-compat, migrated to providers on load)
+  substratum: z.string().optional(),
+  ollama: z.string().optional(),
   apiKey: z.string().optional(),
+  // New: structured providers config
+  providers: ProvidersSchema.optional(),
   privacy: z
     .enum(["local", "hybrid", "semi", "full"])
     .default("hybrid"),
@@ -40,13 +75,21 @@ export const GlobalConfigSchema = z.object({
     .optional(),
 });
 
+// ── Project Config ─────────────────────────────────────────────
+
 export const ProjectConfigSchema = GlobalConfigSchema.partial().extend({
   projectName: z.string().optional(),
   techStack: z.array(z.string()).optional(),
   ignorePaths: z.array(z.string()).optional(),
 });
 
+// ── Types ──────────────────────────────────────────────────────
+
 export type ToolPermissions = z.infer<typeof ToolPermissionsSchema>;
+export type OllamaNode = z.infer<typeof OllamaNodeSchema>;
+export type OllamaProvider = z.infer<typeof OllamaProviderSchema>;
+export type SubstratumProvider = z.infer<typeof SubstratumProviderSchema>;
+export type ProvidersConfig = z.infer<typeof ProvidersSchema>;
 export type GlobalConfig = z.infer<typeof GlobalConfigSchema>;
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
 export type MergedConfig = GlobalConfig;

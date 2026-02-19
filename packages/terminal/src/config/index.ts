@@ -11,15 +11,46 @@ import { atomicWriteFileSync } from "../utils/atomic-write.js";
 import {
   GlobalConfigSchema,
   ProjectConfigSchema,
+  ProvidersSchema,
   type GlobalConfig,
   type ProjectConfig,
   type MergedConfig,
+  type ProvidersConfig,
 } from "./schema.js";
 
 function stripJsonComments(text: string): string {
-  return text
-    .replace(/\/\/.*$/gm, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "");
+  // Remove comments while preserving strings (which may contain // or /*)
+  let result = "";
+  let i = 0;
+  while (i < text.length) {
+    // Handle strings (skip their contents)
+    if (text[i] === '"') {
+      result += '"';
+      i++;
+      while (i < text.length && text[i] !== '"') {
+        if (text[i] === '\\') {
+          result += text[i++]; // escape char
+        }
+        if (i < text.length) result += text[i++];
+      }
+      if (i < text.length) result += text[i++]; // closing "
+      continue;
+    }
+    // Line comment
+    if (text[i] === '/' && text[i + 1] === '/') {
+      while (i < text.length && text[i] !== '\n') i++;
+      continue;
+    }
+    // Block comment
+    if (text[i] === '/' && text[i + 1] === '*') {
+      i += 2;
+      while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+    result += text[i++];
+  }
+  return result;
 }
 
 function readJsonc(filePath: string): unknown {
@@ -41,6 +72,44 @@ export class ConfigManager {
     this.globalConfig = GlobalConfigSchema.parse({});
   }
 
+  /**
+   * Migrate legacy config (flat substratum/ollama strings) to providers object.
+   * Called before Zod parse. If already migrated, returns as-is.
+   */
+  private migrateIfNeeded(raw: Record<string, unknown>): Record<string, unknown> {
+    if (raw.providers) return raw;
+
+    const substratumUrl = (raw.substratum as string) || "https://api.substratum.dev";
+    const ollamaUrl = (raw.ollama as string) || "http://localhost:11434";
+    const isLegacySubstratum = substratumUrl !== "https://api.substratum.dev";
+
+    const migrated = { ...raw };
+    migrated.providers = {
+      substratum: {
+        enabled: isLegacySubstratum || Boolean(raw.apiKey),
+        url: substratumUrl,
+        apiKey: raw.apiKey,
+      },
+      ollama: {
+        mode: "local",
+        nodes: [{ name: "local", url: ollamaUrl, priority: 5 }],
+      },
+    };
+    return migrated;
+  }
+
+  /**
+   * Get resolved providers config (always available, migrated from legacy if needed).
+   */
+  getProviders(): ProvidersConfig {
+    if (this.globalConfig.providers) {
+      return this.globalConfig.providers;
+    }
+    // Build from legacy fields
+    const migrated = this.migrateIfNeeded(this.globalConfig as Record<string, unknown>);
+    return ProvidersSchema.parse(migrated.providers);
+  }
+
   getGlobalConfigPath(): string {
     return join(homedir(), ".wabisabi", "config.jsonc");
   }
@@ -53,8 +122,9 @@ export class ConfigManager {
     try {
       const path = this.getGlobalConfigPath();
       const data = readJsonc(path);
-      if (data) {
-        this.globalConfig = GlobalConfigSchema.parse(data);
+      if (data && typeof data === "object") {
+        const migrated = this.migrateIfNeeded(data as Record<string, unknown>);
+        this.globalConfig = GlobalConfigSchema.parse(migrated);
       }
     } catch {
       // Invalid config file - use defaults

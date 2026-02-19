@@ -41,6 +41,19 @@ toolRegistry.register(webTool);
 // Load global config
 configManager.loadGlobal();
 
+/** Merge CLI flags with config file defaults */
+function resolveOptions(cliOpts: CLIOptions): CLIOptions {
+  const providers = configManager.getProviders();
+  const merged = configManager.getMerged();
+
+  return {
+    ...cliOpts,
+    model: cliOpts.model || merged.model || "llama3.2",
+    providers,
+    provider: (cliOpts.provider as "substratum" | "ollama" | undefined) || undefined,
+  };
+}
+
 const program = new Command();
 
 program
@@ -49,9 +62,10 @@ program
     "🤖 AI Terminal IDE - Code with intelligent agents (OpenCode-compatible)",
   )
   .version("1.0.0")
-  .option("--substratum <url>", "Substratum API URL", "http://localhost:3001")
-  .option("--ollama <url>", "Ollama local URL", "http://localhost:11434")
+  .option("--substratum <url>", "Substratum API URL (legacy)")
+  .option("--ollama <url>", "Ollama URL (legacy, use config wizard for cluster)")
   .option("--model <name>", "Model to use", "llama3.2")
+  .option("--provider <type>", "Force provider: substratum or ollama")
   .option("--api-key <key>", "[DEPRECATED] API key - use WABISABI_API_KEY env var instead")
   .option(
     "--privacy <level>",
@@ -74,7 +88,7 @@ program
   )
   .option("--agent <type>", "Agent to use (build, plan, search)", "build")
   .action(async (cmdOpts: { agent?: string }) => {
-    const opts = program.opts() as CLIOptions;
+    const opts = resolveOptions(program.opts() as CLIOptions);
     const agentType = cmdOpts.agent || "build";
 
     const agentMap: Record<string, () => Promise<any>> = {
@@ -104,7 +118,7 @@ program
   .alias("b")
   .description("📦 Run batch mode with a task file")
   .action(async (file: string) => {
-    const opts = program.opts() as CLIOptions;
+    const opts = resolveOptions(program.opts() as CLIOptions);
     console.log(`📦 Batch mode: ${file}`);
     await import("./modes/batch.js").then((m) => m.batchMode(file, opts));
   });
@@ -118,7 +132,7 @@ program
   .alias("s")
   .description("🌊 Start streaming mode")
   .action(async () => {
-    const opts = program.opts() as CLIOptions;
+    const opts = resolveOptions(program.opts() as CLIOptions);
     await import("./modes/streaming.js").then((m) => m.streamingMode(opts));
   });
 
@@ -131,7 +145,7 @@ program
   .alias("a")
   .description("🤖 Run a specific agent (build, plan, search)")
   .action(async (type: AgentType) => {
-    const opts = program.opts() as CLIOptions;
+    const opts = resolveOptions(program.opts() as CLIOptions);
 
     const agentInfo = AGENTS.find((a) => a.type === type);
     if (!agentInfo) {
@@ -171,20 +185,31 @@ program
 program
   .command("config")
   .alias("c")
-  .description("⚙️ Show current configuration")
-  .action(() => {
-    const opts = program.opts() as CLIOptions;
-    console.log("\n⚙️ WabiSabi Configuration");
-    console.log("═".repeat(40));
-    console.log(`Model: ${opts.model}`);
-    console.log(`Substratum: ${opts.substratum}`);
-    console.log(`Ollama: ${opts.ollama}`);
-    console.log(`Privacy: ${privacyManager.formatDisplay()}`);
-    console.log(`Current Agent: ${agentSwitcher.getInfo().label}`);
-    console.log("\nPermissions:");
-    console.log(`  File Read: ${opts.allowFileRead ? "✓" : "✗"}`);
-    console.log(`  File Write: ${opts.allowFileWrite ? "✓" : "✗"}`);
-    console.log(`  System Commands: ${opts.allowSystemCommands ? "✓" : "✗"}`);
+  .description("⚙️ Configuration management (show, wizard, test)")
+  .option("--wizard", "Launch interactive configuration wizard")
+  .option("--add-node <url>", "Quick-add an Ollama node by URL")
+  .option("--test", "Test connectivity to all configured endpoints")
+  .option("--show", "Show current configuration (default)")
+  .action(async (options: { wizard?: boolean; addNode?: string; test?: boolean; show?: boolean }) => {
+    const { showConfig, runConfigWizard, quickAddNode, testConnectivity } = await import("./wizard/config-wizard.js");
+
+    if (options.wizard) {
+      await runConfigWizard();
+      return;
+    }
+
+    if (options.addNode) {
+      await quickAddNode(options.addNode);
+      return;
+    }
+
+    if (options.test) {
+      await testConnectivity();
+      return;
+    }
+
+    // Default: show config
+    showConfig();
   });
 
 // ═══════════════════════════════════════════════════════════════
@@ -275,7 +300,7 @@ program
   .option("--prompt <text>", "LLM prompt on file change (use {file} placeholder)")
   .option("--ignore <dirs>", "Comma-separated directories to ignore")
   .action(async (cmdOpts: { command?: string; prompt?: string; ignore?: string }) => {
-    const opts = program.opts() as CLIOptions;
+    const opts = resolveOptions(program.opts() as CLIOptions);
     await import("./modes/watch.js").then((m) =>
       m.watchMode(opts, {
         command: cmdOpts.command,
@@ -294,7 +319,7 @@ program
   .description("🌐 Start web-based terminal UI (xterm.js)")
   .option("--port <number>", "HTTP/WS port", "3333")
   .action(async (cmdOpts: { port?: string }) => {
-    const opts = program.opts() as CLIOptions;
+    const opts = resolveOptions(program.opts() as CLIOptions);
     const port = parseInt(cmdOpts.port || "3333", 10);
     await import("./modes/web.js").then((m) => m.webMode(opts, port));
   });
@@ -307,7 +332,7 @@ program
   .command("collab <request>")
   .description("🤝 Multi-agent collaboration on a complex task")
   .action(async (request: string) => {
-    const opts = program.opts() as CLIOptions;
+    const opts = resolveOptions(program.opts() as CLIOptions);
     const { AgentCoordinator } = await import("./agents/coordinator.js");
     const { projectContext } = await import("./context/index.js");
     await projectContext.initialize();
@@ -433,7 +458,7 @@ program
       }
 
       // Launch the agent that was used in this session
-      const opts = program.opts() as CLIOptions;
+      const opts = resolveOptions(program.opts() as CLIOptions);
       const agentName = session.agent.replace("Agent", "").toLowerCase();
       const agentMap: Record<string, () => Promise<any>> = {
         build: () => import("./agents/build/index.js").then((m) => m.BuildAgent),
@@ -499,7 +524,12 @@ program
   .alias("about")
   .description("ℹ️ Show system information")
   .action(() => {
-    const opts = program.opts() as CLIOptions;
+    const opts = resolveOptions(program.opts() as CLIOptions);
+    const providers = opts.providers || configManager.getProviders();
+    const ollamaMode = providers.ollama.mode;
+    const ollamaNodes = providers.ollama.nodes.length;
+    const subEnabled = providers.substratum.enabled ? "enabled" : "disabled";
+
     console.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║  🤖 WabiSabi - AI Terminal IDE                             ║
@@ -507,21 +537,17 @@ program
 ║                                                            ║
 ║  Version: 1.0.0                                            ║
 ║                                                            ║
-║  Current Configuration:                                    ║
+║  Providers:                                                ║
+║    Ollama: ${(ollamaMode + " (" + ollamaNodes + " nodes)").padEnd(30)}║
+║    Substratum: ${subEnabled.padEnd(27)}║
 ║    Model: ${opts.model.padEnd(30)}║
-║    Substratum: ${opts.substratum.padEnd(27)}║
-║    Ollama: ${opts.ollama.padEnd(31)}║
 ║    Privacy: ${privacyManager.formatDisplay().padEnd(28)}║
 ║                                                            ║
 ║  Status:                                                   ║
 ║    Agent: ${agentSwitcher.getInfo().label.padEnd(33)}║
-║    Plugins: (coming soon)                                ║
 ║                                                            ║
-║  Compatible with:                                          ║
-║    ✅ Claude Code Skills                                  ║
-║    ✅ OpenCode Plugins                                    ║
-║    ✅ Substratum Backend                                  ║
-║    ✅ Ollama Local Models                                 ║
+║  Run 'wabisabi config --wizard' to reconfigure             ║
+║  Run 'wabisabi config --test' to test connectivity         ║
 ║                                                            ║
 ╚════════════════════════════════════════════════════════════╝
 `);

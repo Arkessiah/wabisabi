@@ -7,18 +7,24 @@
  */
 
 import type { ToolSpec } from "../tools/index.js";
+import type { ProvidersConfig } from "../config/schema.js";
+import { OllamaCluster, type ClusterNodeStatus } from "./ollama-cluster.js";
 
 // ── Types ──────────────────────────────────────────────────────
 
 export interface CLIOptions {
-  substratum: string;
-  ollama: string;
+  // Legacy (backward-compat)
+  substratum?: string;
+  ollama?: string;
   model: string;
   apiKey?: string;
   privacy?: string;
   allowFileRead?: boolean;
   allowFileWrite?: boolean;
   allowSystemCommands?: boolean;
+  // New provider system
+  providers?: ProvidersConfig;
+  provider?: "substratum" | "ollama";
 }
 
 export interface ToolCall {
@@ -117,21 +123,43 @@ function formatNetworkError(error: unknown, providerUrl: string): string {
 
 export class ApiClient {
   private substratumUrl: string;
-  private ollamaUrl: string;
+  private substratumEnabled: boolean;
+  private ollamaCluster: OllamaCluster;
   private apiKey: string | undefined;
   private activeProvider: ProviderType = "substratum";
+  private activeNodeName: string | null = null;
   private providerChecked = false;
   private providerAvailable = false;
+  private forcedProvider: ProviderType | null = null;
   model: string;
 
   constructor(options: CLIOptions) {
-    this.substratumUrl = options?.substratum || "http://localhost:3001";
-    this.ollamaUrl = options?.ollama || "http://localhost:11434";
     this.model = options?.model || "llama3.2";
     this.apiKey =
       options?.apiKey ||
       process.env.WABISABI_API_KEY ||
       process.env.OPENAI_API_KEY;
+
+    if (options?.providers) {
+      // New provider config format
+      const { substratum, ollama } = options.providers;
+      this.substratumUrl = substratum.url;
+      this.substratumEnabled = substratum.enabled;
+      if (substratum.apiKey) this.apiKey = this.apiKey || substratum.apiKey;
+      this.ollamaCluster = new OllamaCluster(ollama.nodes);
+    } else {
+      // Legacy: single URLs
+      this.substratumUrl = options?.substratum || "https://api.substratum.dev";
+      this.substratumEnabled = Boolean(options?.substratum);
+      const ollamaUrl = options?.ollama || "http://localhost:11434";
+      this.ollamaCluster = new OllamaCluster([
+        { name: "local", url: ollamaUrl, priority: 5 },
+      ]);
+    }
+
+    if (options?.provider) {
+      this.forcedProvider = options.provider;
+    }
   }
 
   /**
@@ -144,20 +172,71 @@ export class ApiClient {
     }
 
     if (this.activeProvider === "ollama") {
-      return `${this.ollamaUrl}/v1/chat/completions`;
+      const node = this.ollamaCluster.getActiveNode();
+      if (node) {
+        this.activeNodeName = node.name;
+        return `${node.url}/v1/chat/completions`;
+      }
+      // Fallback to substratum if cluster has no healthy nodes
+      if (this.substratumEnabled) {
+        return `${this.substratumUrl}/v1/chat/completions`;
+      }
     }
     return `${this.substratumUrl}/v1/chat/completions`;
   }
 
   /**
    * Detect which provider is available.
-   * Priority: Substratum > Ollama
-   * Ollama exposes an OpenAI-compatible API at /v1/ since v0.1.24
+   * Priority: forced > Substratum (if enabled) > Ollama cluster
    */
   async detectProvider(): Promise<ProviderType> {
     this.providerChecked = true;
 
-    // Try Substratum first
+    // If forced, only check that one
+    if (this.forcedProvider === "ollama") {
+      await this.ollamaCluster.checkAllNodes();
+      if (this.ollamaCluster.hasHealthyNodes()) {
+        this.activeProvider = "ollama";
+        this.providerAvailable = true;
+        this.ollamaCluster.startHealthChecks();
+        return "ollama";
+      }
+    }
+
+    if (this.forcedProvider === "substratum") {
+      const ok = await this.checkSubstratum();
+      if (ok) return "substratum";
+      this.providerAvailable = false;
+      return "substratum";
+    }
+
+    // Auto-detect: Substratum first (if enabled), then Ollama cluster
+    if (this.substratumEnabled) {
+      const ok = await this.checkSubstratum();
+      if (ok) {
+        // Also start Ollama health checks in background for failover
+        this.ollamaCluster.checkAllNodes().then(() => {
+          this.ollamaCluster.startHealthChecks();
+        }).catch(() => {});
+        return "substratum";
+      }
+    }
+
+    // Try Ollama cluster
+    await this.ollamaCluster.checkAllNodes();
+    if (this.ollamaCluster.hasHealthyNodes()) {
+      this.activeProvider = "ollama";
+      this.providerAvailable = true;
+      this.ollamaCluster.startHealthChecks();
+      return "ollama";
+    }
+
+    // No provider available
+    this.providerAvailable = false;
+    return "substratum";
+  }
+
+  private async checkSubstratum(): Promise<boolean> {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3000);
@@ -169,29 +248,10 @@ export class ApiClient {
       if (res.ok) {
         this.activeProvider = "substratum";
         this.providerAvailable = true;
-        return "substratum";
+        return true;
       }
     } catch {}
-
-    // Try Ollama
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch(`${this.ollamaUrl}/api/tags`, {
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      if (res.ok) {
-        this.activeProvider = "ollama";
-        this.providerAvailable = true;
-        return "ollama";
-      }
-    } catch {}
-
-    // No provider available - will fail on actual requests with clear error
-    this.activeProvider = "substratum";
-    this.providerAvailable = false;
-    return "substratum";
+    return false;
   }
 
   /**
@@ -224,27 +284,15 @@ export class ApiClient {
       results.push({ type: "substratum", url: this.substratumUrl, available: false });
     }
 
-    // Check Ollama
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch(`${this.ollamaUrl}/api/tags`, {
-        signal: controller.signal,
+    // Check Ollama cluster nodes
+    await this.ollamaCluster.checkAllNodes();
+    for (const nodeStatus of this.ollamaCluster.getStatus()) {
+      results.push({
+        type: "ollama",
+        url: nodeStatus.url,
+        available: nodeStatus.healthy,
+        models: nodeStatus.models,
       });
-      clearTimeout(timeout);
-      if (res.ok) {
-        const data = await res.json();
-        results.push({
-          type: "ollama",
-          url: this.ollamaUrl,
-          available: true,
-          models: data.models?.map((m: any) => m.name) || [],
-        });
-      } else {
-        results.push({ type: "ollama", url: this.ollamaUrl, available: false });
-      }
-    } catch {
-      results.push({ type: "ollama", url: this.ollamaUrl, available: false });
     }
 
     return results;
@@ -258,6 +306,16 @@ export class ApiClient {
   /** Check if any provider was detected as available */
   isProviderAvailable(): boolean {
     return this.providerAvailable;
+  }
+
+  /** Get cluster node status for diagnostics */
+  getClusterStatus(): ClusterNodeStatus[] {
+    return this.ollamaCluster.getStatus();
+  }
+
+  /** Cleanup timers and resources */
+  destroy(): void {
+    this.ollamaCluster.destroy();
   }
 
   private getHeaders(): Record<string, string> {
@@ -393,11 +451,16 @@ export class ApiClient {
 
       return (await response.json()) as ChatResponse;
     } catch (error) {
+      // Report failure to cluster for circuit breaker
+      if (this.activeProvider === "ollama" && this.activeNodeName) {
+        this.ollamaCluster.reportFailure(this.activeNodeName);
+      }
+
       const providerUrl = this.activeProvider === "ollama"
-        ? this.ollamaUrl
+        ? (this.activeNodeName ? this.ollamaCluster.getStatus().find(n => n.name === this.activeNodeName)?.url : this.substratumUrl) || this.substratumUrl
         : this.substratumUrl;
       const errorMsg = !this.providerAvailable
-        ? `No AI providers available. Start Substratum (${this.substratumUrl}) or Ollama (${this.ollamaUrl}).`
+        ? `No AI providers available. Configure Substratum or Ollama via 'wabisabi config --wizard'.`
         : formatNetworkError(error, providerUrl);
 
       return {
@@ -548,8 +611,12 @@ export class ApiClient {
   }
 
   async chatOllama(prompt: string): Promise<string> {
+    if (!this.providerChecked) await this.detectProvider();
+    const node = this.ollamaCluster.getActiveNode();
+    const baseUrl = node?.url || "http://localhost:11434";
+
     const response = await this.fetchRetry(
-      `${this.ollamaUrl}/api/generate`,
+      `${baseUrl}/api/generate`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -562,9 +629,11 @@ export class ApiClient {
     );
 
     if (!response.ok) {
+      if (node) this.ollamaCluster.reportFailure(node.name);
       throw new Error(`Ollama HTTP ${response.status}`);
     }
 
+    if (node) this.ollamaCluster.reportSuccess(node.name);
     const data = await response.json();
     return data.response || "No response";
   }
