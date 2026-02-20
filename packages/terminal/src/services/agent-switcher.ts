@@ -10,7 +10,6 @@ export type AgentType = "build" | "plan" | "search";
 export interface AgentInfo {
   type: AgentType;
   label: string;
-  icon: string;
   description: string;
   shortcut: string;
 }
@@ -20,21 +19,18 @@ export const AGENTS: AgentInfo[] = [
   {
     type: "build",
     label: "BUILD",
-    icon: "🏗️",
     description: "Generates complete code",
     shortcut: "Ctrl+1",
   },
   {
     type: "plan",
     label: "PLAN",
-    icon: "📋",
     description: "Creates plans and tasks",
     shortcut: "Ctrl+2",
   },
   {
     type: "search",
     label: "SEARCH",
-    icon: "🔍",
     description: "Researches and finds information",
     shortcut: "Ctrl+3",
   },
@@ -110,7 +106,7 @@ export class AgentSwitcher {
    */
   formatPrompt(): string {
     const info = this.getInfo();
-    return `${info.icon} [${info.label}] > `;
+    return `[${info.label}] > `;
   }
 
   /**

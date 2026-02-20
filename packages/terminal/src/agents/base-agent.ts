@@ -1035,7 +1035,6 @@ export abstract class BaseAgent {
     const sessionId = sessionManager.getCurrent()?.id || "";
     this.io.updateHeader({
       agent: agentSwitcher.get(),
-      agentIcon: agentSwitcher.getInfo().icon,
       agentLabel: agentSwitcher.getInfo().label,
       model: this.client.model,
       provider: provider,

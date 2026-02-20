@@ -44,7 +44,6 @@ export class TuiTerminalIO implements TerminalIO {
       const info = agentSwitcher.getInfo();
       this.engine.updateHeader({
         agent,
-        agentIcon: info.icon,
         agentLabel: info.label,
       });
       this.engine.input.setPrompt(`${chalk.cyan(`[${info.label}]`)} ${chalk.green(">")} `);
@@ -167,7 +166,6 @@ export class TuiTerminalIO implements TerminalIO {
         id: agent.type,
         label: agent.label,
         description: agent.description,
-        icon: agent.icon,
         active: agent.type === opts.currentAgent,
         section: "agents",
       });

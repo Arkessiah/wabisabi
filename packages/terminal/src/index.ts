@@ -10,8 +10,10 @@ import {
   configManager,
   toolRegistry,
   sessionManager,
+  workspaceTrust,
 } from "./services/index.js";
 import type { CLIOptions } from "./clients/api-client.js";
+import chalk from "chalk";
 
 // Register all tools
 import { readTool } from "./tools/read.js";
@@ -88,7 +90,17 @@ program
     "🚀 Start interactive mode with the default agent",
   )
   .option("--agent <type>", "Agent to use (build, plan, search)", "build")
-  .action(async (cmdOpts: { agent?: string }) => {
+  .option("--trust", "Trust current directory without prompting")
+  .action(async (cmdOpts: { agent?: string; trust?: boolean }) => {
+    // Workspace trust check
+    const cwd = process.cwd();
+    if (cmdOpts.trust) {
+      workspaceTrust.trust(cwd);
+    } else {
+      const trusted = await workspaceTrust.ensureTrusted(cwd);
+      if (!trusted) process.exit(0);
+    }
+
     const opts = resolveOptions(program.opts() as CLIOptions);
     const globalOpts = program.opts();
     const agentType = cmdOpts.agent || "build";
@@ -164,8 +176,12 @@ program
 program
   .command("agent <type>")
   .alias("a")
-  .description("🤖 Run a specific agent (build, plan, search)")
+  .description("Run a specific agent (build, plan, search)")
   .action(async (type: AgentType) => {
+    // Workspace trust check
+    const trusted = await workspaceTrust.ensureTrusted(process.cwd());
+    if (!trusted) process.exit(0);
+
     const opts = resolveOptions(program.opts() as CLIOptions);
 
     const agentInfo = AGENTS.find((a) => a.type === type);
@@ -755,6 +771,52 @@ program
 ║                                                            ║
 ╚════════════════════════════════════════════════════════════╝
 `);
+  });
+
+// ═══════════════════════════════════════════════════════════════
+// WORKSPACE TRUST
+// ═══════════════════════════════════════════════════════════════
+
+program
+  .command("trust")
+  .description("Manage trusted workspaces")
+  .option("--list", "List trusted directories")
+  .option("--add [dir]", "Trust a directory (default: current)")
+  .option("--revoke [dir]", "Revoke trust for a directory")
+  .action((options: { list?: boolean; add?: string | boolean; revoke?: string | boolean }) => {
+    if (options.list || (!options.add && !options.revoke)) {
+      const workspaces = workspaceTrust.list();
+      if (workspaces.length === 0) {
+        console.log("\n  No trusted workspaces yet.");
+        console.log("  Run wabisabi in a directory to trust it.\n");
+      } else {
+        console.log("\n  Trusted Workspaces");
+        console.log("  " + "-".repeat(50));
+        for (const w of workspaces) {
+          const date = new Date(w.trustedAt).toLocaleDateString();
+          console.log(`  ${w.path}  ${chalk.dim(date)}`);
+        }
+        console.log("");
+      }
+      return;
+    }
+
+    if (options.add !== undefined) {
+      const dir = typeof options.add === "string" ? options.add : process.cwd();
+      workspaceTrust.trust(dir);
+      console.log(chalk.green(`  + Trusted: ${dir}`));
+      return;
+    }
+
+    if (options.revoke !== undefined) {
+      const dir = typeof options.revoke === "string" ? options.revoke : process.cwd();
+      const removed = workspaceTrust.revoke(dir);
+      if (removed) {
+        console.log(chalk.yellow(`  - Revoked: ${dir}`));
+      } else {
+        console.log(chalk.dim(`  Directory not in trust list: ${dir}`));
+      }
+    }
   });
 
 // Default to interactive mode when no subcommand

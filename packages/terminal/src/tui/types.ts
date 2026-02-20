@@ -12,7 +12,6 @@ import type { AgentType } from "../services/agent-switcher.js";
 
 export interface HeaderInfo {
   agent: AgentType;
-  agentIcon: string;
   agentLabel: string;
   model: string;
   provider: string;

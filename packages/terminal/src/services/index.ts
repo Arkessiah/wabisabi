@@ -133,3 +133,7 @@ export {
   renderMarkdown,
   hasMarkdown,
 } from "../rendering/index.js";
+
+export {
+  workspaceTrust,
+} from "./workspace-trust.js";

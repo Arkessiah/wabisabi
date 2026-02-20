@@ -17,7 +17,6 @@ import chalk from "chalk";
 export class HeaderBar extends Panel {
   private info: HeaderInfo = {
     agent: "build",
-    agentIcon: "🏗️",
     agentLabel: "BUILD",
     model: "---",
     provider: "---",
@@ -48,7 +47,7 @@ export class HeaderBar extends Panel {
     const ctxColor = ctxPct > 75 ? chalk.red : ctxPct > 50 ? chalk.yellow : chalk.green;
     const ctxStr = ctxPct > 0 ? ctxColor(`${ctxPct}%`) : "";
 
-    const agentSeg = chalk.bgCyan.black.bold(` ${this.info.agentIcon} ${this.info.agentLabel} `);
+    const agentSeg = chalk.bgCyan.black.bold(` ${this.info.agentLabel} `);
     const modelSeg = chalk.white(` ${this.info.model} `);
     const providerSeg = chalk.dim(`${this.info.provider}`);
     const sessionSeg = chalk.dim(`ses:${this.info.sessionId.slice(0, 6)}`);
