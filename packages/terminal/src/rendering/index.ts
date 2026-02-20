@@ -6,6 +6,7 @@
  */
 
 import chalk from "chalk";
+import { renderMermaidAscii } from "beautiful-mermaid";
 
 // ── Code Block Syntax Highlighting ───────────────────────────
 
@@ -54,14 +55,37 @@ export function renderMarkdown(text: string): string {
     // Code block toggle
     if (line.trim().startsWith("```")) {
       if (inCodeBlock) {
-        // End code block - render with highlighting
+        // End code block
         const code = codeBuffer.join("\n");
-        const highlighted = highlightCode(code, codeLang);
-        result.push(chalk.dim("  ┌─" + (codeLang ? ` ${codeLang} ` : "") + "─".repeat(40)));
-        for (const codeLine of highlighted.split("\n")) {
-          result.push(chalk.dim("  │ ") + codeLine);
+
+        if (codeLang === "mermaid") {
+          // Render mermaid diagrams as ASCII art
+          try {
+            const ascii = renderMermaidAscii(code, { theme: "default" });
+            result.push(chalk.dim("  ┌─ mermaid " + "─".repeat(33)));
+            for (const asciiLine of ascii.split("\n")) {
+              result.push(chalk.dim("  │ ") + chalk.cyan(asciiLine));
+            }
+            result.push(chalk.dim("  └" + "─".repeat(44)));
+          } catch {
+            // Fallback: show raw mermaid source with highlighting
+            const highlighted = highlightCode(code, codeLang);
+            result.push(chalk.dim("  ┌─ mermaid " + "─".repeat(33)));
+            for (const codeLine of highlighted.split("\n")) {
+              result.push(chalk.dim("  │ ") + codeLine);
+            }
+            result.push(chalk.dim("  └" + "─".repeat(44)));
+          }
+        } else {
+          // Regular code block with syntax highlighting
+          const highlighted = highlightCode(code, codeLang);
+          result.push(chalk.dim("  ┌─" + (codeLang ? ` ${codeLang} ` : "") + "─".repeat(40)));
+          for (const codeLine of highlighted.split("\n")) {
+            result.push(chalk.dim("  │ ") + codeLine);
+          }
+          result.push(chalk.dim("  └" + "─".repeat(44)));
         }
-        result.push(chalk.dim("  └" + "─".repeat(44)));
+
         codeBuffer = [];
         inCodeBlock = false;
         codeLang = "";
