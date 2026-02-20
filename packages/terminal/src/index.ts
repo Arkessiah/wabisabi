@@ -74,7 +74,8 @@ program
   )
   .option("--allow-file-read", "Allow file read skill", false)
   .option("--allow-file-write", "Allow file write skill", false)
-  .option("--allow-system-commands", "Allow bash skill", false);
+  .option("--allow-system-commands", "Allow bash skill", false)
+  .option("--no-tui", "Disable TUI mode (use legacy readline interface)");
 
 // ═══════════════════════════════════════════════════════════════
 // INTERACTIVE MODE
@@ -89,6 +90,7 @@ program
   .option("--agent <type>", "Agent to use (build, plan, search)", "build")
   .action(async (cmdOpts: { agent?: string }) => {
     const opts = resolveOptions(program.opts() as CLIOptions);
+    const globalOpts = program.opts();
     const agentType = cmdOpts.agent || "build";
 
     const agentMap: Record<string, () => Promise<any>> = {
@@ -103,9 +105,28 @@ program
       process.exit(1);
     }
 
+    // Determine I/O mode: TUI or Legacy
+    const useTui = globalOpts.tui !== false && process.stdout.isTTY;
+    let io: import("./tui/types.js").TerminalIO;
+
+    if (useTui) {
+      const { TuiTerminalIO } = await import("./tui/tui-io.js");
+      const tuiIO = new TuiTerminalIO();
+
+      // Wire agent switching via TUI
+      tuiIO.getEngine().onAgentChange(async (newAgent) => {
+        agentSwitcher.set(newAgent as AgentType);
+      });
+
+      io = tuiIO;
+    } else {
+      const { LegacyTerminalIO } = await import("./tui/legacy-io.js");
+      io = new LegacyTerminalIO();
+    }
+
     agentSwitcher.set(agentType as AgentType);
     const AgentClass = await agentMap[agentType]();
-    const agent = new AgentClass(opts);
+    const agent = new AgentClass(opts, io);
     await agent.run();
   });
 
@@ -164,7 +185,22 @@ program
     };
 
     const AgentClass = await agentMap[type]();
-    const agent = new AgentClass(opts);
+
+    // Use TUI if available
+    const globalOpts = program.opts();
+    const useTui = globalOpts.tui !== false && process.stdout.isTTY;
+    let io: import("./tui/types.js").TerminalIO | undefined;
+
+    if (useTui) {
+      const { TuiTerminalIO } = await import("./tui/tui-io.js");
+      const tuiIO = new TuiTerminalIO();
+      tuiIO.getEngine().onAgentChange(async (newAgent) => {
+        agentSwitcher.set(newAgent as AgentType);
+      });
+      io = tuiIO;
+    }
+
+    const agent = new AgentClass(opts, io);
     await agent.run();
   });
 
