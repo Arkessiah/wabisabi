@@ -57,6 +57,7 @@ import chalk from "chalk";
 import type { TerminalIO } from "../tui/types.js";
 import { LegacyTerminalIO } from "../tui/legacy-io.js";
 import { agentSwitcher } from "../services/agent-switcher.js";
+import { cortexEngine } from "../cortex/index.js";
 
 // Tools that modify files - auto-log to PLAN.md
 const MUTATING_TOOLS = new Set(["write", "edit", "bash"]);
@@ -145,6 +146,7 @@ export abstract class BaseAgent {
             "  /pins             List pinned items\n" +
             "  /unpin <id>       Remove a pin\n" +
             "  /device <type>    Set device profile (mobile/laptop/desktop/server)\n" +
+            "  /cortex           Show Cortex ML stats & token savings\n" +
             chalk.dim("  ──────────────────────────────────\n") +
             chalk.bold("  Profiles (Six Hats)\n") +
             "  /hat [name]       Set thinking hat (white/red/black/yellow/green/blue)\n" +
@@ -603,6 +605,25 @@ export abstract class BaseAgent {
         return true;
       }
 
+      case "cortex": {
+        const stats = cortexEngine.getStats();
+        const available = cortexEngine.isAvailable;
+        const enabled = cortexEngine.isEnabled;
+        this.io.writeOutput(
+          chalk.bold("\n  Cortex ML Core\n") +
+            chalk.dim("  ──────────────────────────────────\n") +
+            `  Status:     ${enabled ? (available ? chalk.green("active") : chalk.yellow("enabled (model unavailable)")) : chalk.dim("disabled")}\n` +
+            `  Classified: ${stats.classified}\n` +
+            `  Answered:   ${stats.answered}\n` +
+            `  Summarized: ${stats.summarized}\n` +
+            `  Compacted:  ${stats.compacted}\n` +
+            `  Fallbacks:  ${stats.fallbacks}\n` +
+            chalk.dim("  ──────────────────────────────────\n") +
+            chalk.bold(`  Tokens saved: ~${stats.tokensSaved.toLocaleString()}\n`),
+        );
+        return true;
+      }
+
       default:
         this.io.writeOutput(chalk.yellow(`  Unknown command: /${cmd}. Type /help for commands.`));
         return true;
@@ -858,6 +879,23 @@ export abstract class BaseAgent {
 
     let summaryContent: string;
 
+    // Try Cortex first (free, local), then main LLM, then heuristic
+    if (cortexEngine.isEnabled && cortexEngine.isAvailable) {
+      const cortexResult = await cortexEngine.compact(this.conversationHistory, keep);
+      if (cortexResult.length < this.conversationHistory.length) {
+        this.conversationHistory = cortexResult;
+        this.lastPromptTokens = 0;
+        const tokensAfter = estimateConversationTokens(this.conversationHistory);
+        this.io.writeOutput(
+          chalk.green(
+            `  Cortex-compacted: ${oldMessages.length} messages -> summary + last ${keep}` +
+              chalk.dim(` (~${currentTokens} -> ~${tokensAfter} tokens)`),
+          ),
+        );
+        return;
+      }
+    }
+
     try {
       const compactionPrompt = buildCompactionPrompt(oldMessages);
       const summaryResponse = await this.client.chatWithTools(
@@ -925,6 +963,21 @@ export abstract class BaseAgent {
       this.io.writeOutput(
         chalk.dim(`    Start Substratum or Ollama, or set --substratum/--ollama URL`),
       );
+    }
+
+    // Initialize Cortex ML core
+    const cortexConfig = configManager.getMerged().cortex;
+    if (cortexConfig?.enabled !== false) {
+      // Get first Ollama node URL as fallback endpoint for Cortex
+      const merged = configManager.getMerged();
+      const ollamaEndpoint = merged.providers?.ollama?.nodes?.[0]?.url
+        || merged.ollama
+        || "http://localhost:11434";
+      cortexEngine.updateConfig(cortexConfig || {}, ollamaEndpoint);
+      const cortexAvailable = await cortexEngine.checkAvailability();
+      if (cortexAvailable) {
+        this.io.writeOutput(chalk.green("  ✓ Cortex ML") + chalk.dim(` (${cortexConfig?.model || "qwen2.5:0.5b"})`));
+      }
     }
 
     // Initialize project context
@@ -1044,6 +1097,25 @@ export abstract class BaseAgent {
         // Track interaction in soul
         soulManager.trackInteraction();
 
+        // Cortex pre-LLM: classify and attempt local answer
+        if (cortexEngine.isEnabled) {
+          const classification = await cortexEngine.classify(trimmed);
+          if (
+            classification.canAnswerLocally &&
+            classification.confidence >= (cortexEngine.thresholds.answerConfidence)
+          ) {
+            const localAnswer = await cortexEngine.answer(trimmed);
+            if (localAnswer) {
+              this.io.writeOutput(chalk.dim("[cortex] ") + localAnswer);
+              this.conversationHistory.push({ role: "user", content: trimmed });
+              this.conversationHistory.push({ role: "assistant", content: localAnswer });
+              await sessionManager.addMessage({ role: "user", content: trimmed, timestamp: Date.now() });
+              await sessionManager.addMessage({ role: "assistant", content: `[cortex] ${localAnswer}`, timestamp: Date.now() });
+              continue;
+            }
+          }
+        }
+
         // Add user message
         this.conversationHistory.push({ role: "user", content: trimmed });
         await sessionManager.addMessage({
@@ -1068,9 +1140,22 @@ export abstract class BaseAgent {
           for (const call of result.tool_calls) {
             const toolResult = await this.executeToolCall(call);
 
+            // Cortex post-tool: summarize long outputs to save context
+            let contextOutput = toolResult.output;
+            if (
+              cortexEngine.isEnabled &&
+              cortexEngine.isAvailable &&
+              toolResult.output.length > cortexEngine.thresholds.summarizeAbove
+            ) {
+              const summary = await cortexEngine.summarize(call.function.name, toolResult.output);
+              if (summary.length < toolResult.output.length) {
+                contextOutput = summary;
+              }
+            }
+
             this.conversationHistory.push({
               role: "tool",
-              content: toolResult.output,
+              content: contextOutput,
               tool_call_id: call.id,
             });
 

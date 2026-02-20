@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { CortexConfigSchema } from "../cortex/schema.js";
 
 // ── Tool Permissions ───────────────────────────────────────────
 
@@ -65,6 +66,7 @@ export const GlobalConfigSchema = z.object({
   temperature: z.number().min(0).max(2).default(0.7),
   maxTokens: z.number().default(4096),
   streaming: z.boolean().default(true),
+  cortex: CortexConfigSchema.optional(),
   sessionsDir: z.string().optional(),
   profile: z
     .object({
@@ -93,3 +95,4 @@ export type ProvidersConfig = z.infer<typeof ProvidersSchema>;
 export type GlobalConfig = z.infer<typeof GlobalConfigSchema>;
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
 export type MergedConfig = GlobalConfig;
+export type { CortexConfig } from "../cortex/schema.js";
