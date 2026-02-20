@@ -1,113 +1,101 @@
 /**
  * WabiSabi ASCII Banner
  *
- * 8-bit style robot mascot (hoodie, dark face, red eyes)
- * alongside "WABI SABI" in large block letters.
- * Colors: grey robot, red eyes, blue->purple gradient text, orange accents.
+ * 8-bit pixel-art robot mascot alongside "WABISABI" in large block letters.
+ * Displayed as splash screen on startup and in onboarding.
  */
 
 import chalk from "chalk";
 
-// ── 8-bit Robot (hoodie, dark face, glowing eyes, sneakers) ──
+// ── Colors ──────────────────────────────────────────────────
 
-const ROBOT_LINES = [
-  "     ┌─────┐     ",
-  "    ┌┤ ░░░ ├┐    ",
-  "    │├─────┤│    ",
-  "    ││ " + "● ●" + " ││    ",
-  "    │├─────┤│    ",
-  "    └┤ ▬▬▬ ├┘    ",
-  "     ├─────┤     ",
-  "   ┌─┤     ├─┐   ",
-  "   │ ├─────┤ │   ",
-  "   └┐│     │┌┘   ",
-  "    └┤     ├┘    ",
-  "     │ │ │ │     ",
-  "     └─┘ └─┘     ",
-];
+const R = chalk.red;          // eyes
+const G = chalk.gray;         // robot body
+const D = chalk.dim;          // dark details
+const W = chalk.white;        // highlights
+const O = chalk.hex("#FF6600"); // orange accent (hoodie logo)
+const B = chalk.blue;         // WABI text
+const M = chalk.magenta;      // SABI text
 
-// Colorized robot
+// ── 8-bit Robot (bigger, pixel-art style) ───────────────────
+// Hoodie bot with dark visor, glowing red eyes, sneakers
+// ~15 lines tall, ~22 chars wide
+
 function colorizeRobot(): string[] {
   return [
-    chalk.gray("     ┌─────┐     "),
-    chalk.gray("    ┌┤") + chalk.gray(" ░░░ ") + chalk.gray("├┐    "),
-    chalk.gray("    │├─────┤│    "),
-    chalk.gray("    ││ ") + chalk.red("● ●") + chalk.gray(" ││    "),
-    chalk.gray("    │├─────┤│    "),
-    chalk.gray("    └┤") + chalk.gray(" ▬▬▬ ") + chalk.gray("├┘    "),
-    chalk.gray("     ├─────┤     "),
-    chalk.gray("   ┌─┤     ├─┐   "),
-    chalk.gray("   │ ├─────┤ │   "),
-    chalk.gray("   └┐│") + chalk.hex("#FF6600")("░░░░░") + chalk.gray("│┌┘   "),
-    chalk.gray("    └┤     ├┘    "),
-    chalk.gray("     │ │ │ │     "),
-    chalk.white("     └─┘ └─┘     "),
+    G("        ▄██████▄        "),
+    G("      ▄██") + D("░░░░░░") + G("██▄      "),
+    G("     ███") + D("░░░░░░░░") + G("███     "),
+    G("    ███") + D("░░░░░░░░░░") + G("███    "),
+    G("    ███") + D("░░") + R("██") + D("░░░░") + R("██") + D("░░") + G("███    "),
+    G("    ███") + D("░░") + R("██") + D("░░░░") + R("██") + D("░░") + G("███    "),
+    G("    ███") + D("░░░░░░░░░░") + G("███    "),
+    G("    ███") + D("░░") + W("▄████▄") + D("░░") + G("███    "),
+    G("     ███") + D("░░░░░░░░") + G("███     "),
+    G("      ▀██") + D("██████") + G("██▀      "),
+    G("     ▄███") + O("████████") + G("███▄     "),
+    G("    ████") + O("░░░░░░░░") + G("████    "),
+    G("    ████") + O("░░") + W("▄██▄") + O("░░") + G("████    "),
+    G("     ███") + O("░░░░░░░░") + G("███     "),
+    G("      ██") + G("████████") + G("██      "),
+    G("      ██") + G("██") + D("    ") + G("██") + G("██      "),
+    W("      ▀██▀") + D("    ") + W("▀██▀      "),
   ];
 }
 
-// ── WABI SABI block text ──
+// ── WABISABI unified block text ─────────────────────────────
+// One word, big, gradient blue->magenta
 
-const WABI_LINES = [
-  "██╗    ██╗ █████╗ ██████╗ ██╗",
-  "██║    ██║██╔══██╗██╔══██╗██║",
-  "██║ █╗ ██║███████║██████╔╝██║",
-  "██║███╗██║██╔══██║██╔══██╗██║",
-  "╚███╔███╔╝██║  ██║██████╔╝██║",
-  " ╚══╝╚══╝ ╚═╝  ╚═╝╚═════╝ ╚═╝",
+const WABISABI_LINES = [
+  "██╗    ██╗ █████╗ ██████╗ ██╗███████╗ █████╗ ██████╗ ██╗",
+  "██║    ██║██╔══██╗██╔══██╗██║██╔════╝██╔══██╗██╔══██╗██║",
+  "██║ █╗ ██║███████║██████╔╝██║███████╗███████║██████╔╝██║",
+  "██║███╗██║██╔══██║██╔══██╗██║╚════██║██╔══██║██╔══██╗██║",
+  "╚███╔███╔╝██║  ██║██████╔╝██║███████║██║  ██║██████╔╝██║",
+  " ╚══╝╚══╝ ╚═╝  ╚═╝╚═════╝ ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝ ╚═╝",
 ];
 
-const SABI_LINES = [
-  "███████╗ █████╗ ██████╗ ██╗",
-  "██╔════╝██╔══██╗██╔══██╗██║",
-  "███████╗███████║██████╔╝██║",
-  "╚════██║██╔══██║██╔══██╗██║",
-  "███████║██║  ██║██████╔╝██║",
-  "╚══════╝╚═╝  ╚═╝╚═════╝ ╚═╝",
-];
-
-function colorizeText(): string[] {
-  const result: string[] = [];
-  for (let i = 0; i < WABI_LINES.length; i++) {
-    const wabi = chalk.blue(WABI_LINES[i]);
-    const sabi = chalk.magenta(SABI_LINES[i]);
-    result.push(wabi + "  " + sabi);
-  }
-  return result;
+function colorizeWabisabi(): string[] {
+  // Gradient from blue to magenta across each line
+  return WABISABI_LINES.map((line) => {
+    const mid = Math.floor(line.length / 2);
+    return B(line.slice(0, mid)) + M(line.slice(mid));
+  });
 }
 
-// ── Exports ──────────────────────────────────────────────────
+// ── Exports ─────────────────────────────────────────────────
 
 /**
- * Full banner for onboarding and first-run splash.
- * Robot on the left, WABI SABI text on the right.
- * ~13 lines tall.
+ * Full splash banner for startup and onboarding.
+ * Robot on the left, WABISABI text on the right.
+ * ~17 lines tall.
  */
 export function showBanner(): string {
   const robot = colorizeRobot();
-  const text = colorizeText();
+  const text = colorizeWabisabi();
   const lines: string[] = [];
 
   lines.push("");
 
-  // Robot is 13 lines, text is 6 lines - center text vertically
-  const textStart = 3; // Start text at robot line 3 to center
+  // Robot is 17 lines, text is 6 lines - center text vertically beside robot
+  const textStart = 5; // vertically center the text against the robot
   const maxLines = Math.max(robot.length, text.length + textStart);
 
   for (let i = 0; i < maxLines; i++) {
-    const robotLine = i < robot.length ? robot[i] : " ".repeat(18);
+    const robotLine = i < robot.length ? robot[i] : " ".repeat(24);
     const textLine = (i >= textStart && i < textStart + text.length)
       ? "  " + text[i - textStart]
       : "";
     lines.push("  " + robotLine + textLine);
   }
 
-  // Tagline
+  // Tagline under the text block
   lines.push("");
   lines.push(
-    "  " + " ".repeat(18) + "  " +
-    chalk.dim("AI Terminal IDE") +
-    chalk.gray(" · ") +
-    chalk.dim("v1.0.0"),
+    "  " + " ".repeat(24) + "  " +
+    D("AI Terminal IDE") +
+    G(" · ") +
+    D("v1.0.0"),
   );
   lines.push("");
 
@@ -115,53 +103,75 @@ export function showBanner(): string {
 }
 
 /**
- * Compact 1-line banner for the TUI header.
- * Shows mini robot face + "WABI SABI" styled.
+ * Startup splash for the TUI output panel.
+ * Shows the full robot + WABISABI text, plus status info.
+ */
+export function showSplash(info: {
+  model?: string;
+  provider?: string;
+  cwd?: string;
+}): string {
+  const banner = showBanner();
+  const lines = [banner];
+
+  // Status line
+  const parts: string[] = [];
+  if (info.model) parts.push(G("model:") + " " + W(info.model));
+  if (info.provider) parts.push(G("provider:") + " " + W(info.provider));
+  if (info.cwd) parts.push(G("cwd:") + " " + D(info.cwd));
+
+  if (parts.length > 0) {
+    lines.push("  " + " ".repeat(24) + "  " + parts.join(G("  ·  ")));
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Compact 1-line banner for the TUI header bar.
  */
 export function showBannerCompact(): string {
-  const face = chalk.gray("[ ") + chalk.red("●●") + chalk.gray(" ]");
-  const name = chalk.blue.bold("WABI") + chalk.magenta.bold(" SABI");
-  const ver = chalk.dim("v1.0.0");
+  const face = G("[") + R("··") + G("]");
+  const name = B.bold("WABI") + M.bold("SABI");
+  const ver = D("v1.0.0");
   return `${face} ${name} ${ver}`;
 }
 
 /**
  * Compact 2-line banner for TUI header area.
- * Line 1: Robot face + WABI SABI + version
- * Line 2: Tagline
  */
 export function showBannerMini(): { line1: string; line2: string } {
-  const face = chalk.gray("[ ") + chalk.red("●●") + chalk.gray(" ]");
-  const name = chalk.blue.bold("WABI") + chalk.magenta.bold(" SABI");
-  const ver = chalk.dim("v1.0.0");
+  const face = G("[") + R("··") + G("]");
+  const name = B.bold("WABI") + M.bold("SABI");
+  const ver = D("v1.0.0");
   return {
     line1: `${face} ${name} ${ver}`,
-    line2: chalk.dim("AI Terminal IDE"),
+    line2: D("AI Terminal IDE"),
   };
 }
 
 /**
  * Quick-start guide shown after onboarding.
- * Uses orange for command highlights.
  */
 export function showQuickStartGuide(): string {
   const lines: string[] = [];
 
   lines.push(chalk.bold("  Quick Start"));
-  lines.push(chalk.dim("  " + "─".repeat(45)));
-  lines.push("  Type your request and press " + chalk.hex("#FF6600")("Enter"));
+  lines.push(D("  " + "-".repeat(45)));
+  lines.push("  Type your request and press " + O("Enter"));
   lines.push("");
-  lines.push("  " + chalk.hex("#FF6600")("Tab") + "       Cycle agents (BUILD → PLAN → SEARCH)");
-  lines.push("  " + chalk.hex("#FF6600")("Ctrl+P") + "    Command palette");
-  lines.push("  " + chalk.hex("#FF6600")("Ctrl+T") + "    Toggle task panel");
-  lines.push("  " + chalk.hex("#FF6600")("Ctrl+S") + "    Save session");
-  lines.push("  " + chalk.hex("#FF6600")("/help") + "     All commands");
-  lines.push("  " + chalk.hex("#FF6600")("/tools") + "    Available tools");
-  lines.push(chalk.dim("  " + "─".repeat(45)));
+  lines.push("  " + O("Tab") + "       Cycle agents (BUILD > PLAN > SEARCH)");
+  lines.push("  " + O("Ctrl+P") + "    Command palette");
+  lines.push("  " + O("Ctrl+T") + "    Toggle task panel");
+  lines.push("  " + O("Ctrl+S") + "    Save session");
+  lines.push("  " + O("/help") + "     All commands");
+  lines.push("  " + O("/tools") + "    Available tools");
+  lines.push(D("  " + "-".repeat(45)));
   lines.push("");
   lines.push(chalk.bold("  Agents"));
-  lines.push("  " + chalk.blue("build") + "   Write and modify code " + chalk.dim("(default)"));
-  lines.push("  " + chalk.magenta("plan") + "    Analyze and plan architecture");
+  lines.push("  " + B("build") + "   Write and modify code " + D("(default)"));
+  lines.push("  " + M("plan") + "    Analyze and plan architecture");
   lines.push("  " + chalk.cyan("search") + "  Explore and find code");
   lines.push("");
 

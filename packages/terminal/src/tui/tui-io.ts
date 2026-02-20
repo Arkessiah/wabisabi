@@ -15,6 +15,7 @@ import type {
 import type { ActiveTask, PinnedItem } from "../ram/schema.js";
 import { TuiEngine } from "./index.js";
 import { agentSwitcher, AGENTS } from "../services/agent-switcher.js";
+import { showSplash } from "./banner.js";
 import chalk from "chalk";
 
 export class TuiTerminalIO implements TerminalIO {
@@ -34,6 +35,16 @@ export class TuiTerminalIO implements TerminalIO {
 
   async init(): Promise<void> {
     this.engine.start();
+
+    // Show splash banner in the output panel
+    const splash = showSplash({
+      model: "llama3.2",
+      provider: "ollama",
+      cwd: process.cwd(),
+    });
+    for (const line of splash.split("\n")) {
+      this.engine.output.writeStatus(line);
+    }
 
     // Set initial prompt
     const info = agentSwitcher.getInfo();
