@@ -49,6 +49,29 @@ export class TuiTerminalIO implements TerminalIO {
       });
       this.engine.input.setPrompt(`${chalk.cyan(`[${info.label}]`)} ${chalk.green(">")} `);
     });
+
+    // Wire Tab -> agent cycle
+    this.engine.onTab(() => {
+      agentSwitcher.cycle();
+    });
+
+    // Wire Ctrl+P -> command palette
+    this.engine.onPalette(async () => {
+      const currentInfo = agentSwitcher.getInfo();
+      const items = TuiTerminalIO.buildPaletteItems({
+        currentAgent: currentInfo.type,
+        currentModel: "llama3.2",
+        currentProvider: "ollama",
+        tokens: { prompt: 0, completion: 0, total: 0 },
+        contextUsage: 0,
+      });
+      const result = await this.openCommandPalette(items);
+      if (result) {
+        if (result.section === "agents") {
+          agentSwitcher.set(result.itemId as any);
+        }
+      }
+    });
   }
 
   destroy(): void {

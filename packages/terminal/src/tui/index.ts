@@ -40,6 +40,8 @@ export class TuiEngine {
   // External event handlers
   private onAgentSwitch: ((agent: AgentType) => void) | null = null;
   private onSaveSession: (() => void) | null = null;
+  private onTabCycle: (() => void) | null = null;
+  private onOpenPalette: (() => void) | null = null;
 
   constructor() {
     this.screen = new ScreenManager();
@@ -59,6 +61,16 @@ export class TuiEngine {
   /** Register handler for save session */
   onSave(handler: () => void): void {
     this.onSaveSession = handler;
+  }
+
+  /** Register handler for Tab key cycling */
+  onTab(handler: () => void): void {
+    this.onTabCycle = handler;
+  }
+
+  /** Register handler for Ctrl+P palette */
+  onPalette(handler: () => void): void {
+    this.onOpenPalette = handler;
   }
 
   /** Start the TUI */
@@ -182,16 +194,9 @@ export class TuiEngine {
 
   /** Draw separator lines between panels */
   private drawSeparators(): string {
-    const { cols, rows } = this.screen;
-    let buf = "";
-
-    // Header bottom separator
-    const headerH = this.screen.layout.headerHeight;
-    buf += cursor.moveTo(headerH + 1, 1) + style.dim;
-    buf += "─".repeat(cols);
-    buf += style.reset;
-
-    return buf;
+    // Header now draws its own separator in row 3
+    // No additional separators needed here
+    return "";
   }
 
   /** Handle keyboard input */
@@ -212,7 +217,7 @@ export class TuiEngine {
         break;
 
       case "ctrl-p":
-        // Will be handled by TuiTerminalIO
+        if (this.onOpenPalette) this.onOpenPalette();
         break;
 
       case "ctrl-t":
@@ -253,14 +258,14 @@ export class TuiEngine {
 
       case "tab":
       case "shift-tab":
-      case "input":
+      case "input": {
         // Route to input area
         const inputResult = this.input.handleKey(raw);
-        if (inputResult === "tab" && this.onAgentSwitch) {
-          // Tab from input area when not completing a slash command = cycle agent
-          // This is handled by TuiTerminalIO
+        if (inputResult === "tab" && this.onTabCycle) {
+          this.onTabCycle();
         }
         break;
+      }
     }
   }
 

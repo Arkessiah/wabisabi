@@ -249,6 +249,47 @@ program
   });
 
 // ═══════════════════════════════════════════════════════════════
+// OLLAMA MANAGEMENT
+// ═══════════════════════════════════════════════════════════════
+
+program
+  .command("ollama")
+  .description("🦙 Manage Ollama installation and cluster")
+  .option("--install", "Install Ollama locally and pull default models")
+  .option("--pull [model]", "Pull a model on configured nodes")
+  .option("--cluster", "Cluster setup wizard (add nodes, generate scripts)")
+  .option("--status", "Show cluster status and health")
+  .option("--uninstall", "Remove Ollama from this machine")
+  .action(async (options: { install?: boolean; pull?: string | boolean; cluster?: boolean; status?: boolean; uninstall?: boolean }) => {
+    const { ollamaInstall, ollamaPull, ollamaCluster, ollamaStatus, ollamaUninstall } =
+      await import("./wizard/ollama-wizard.js");
+
+    if (options.install) {
+      await ollamaInstall();
+      return;
+    }
+
+    if (options.pull !== undefined) {
+      const model = typeof options.pull === "string" ? options.pull : undefined;
+      await ollamaPull(model);
+      return;
+    }
+
+    if (options.cluster) {
+      await ollamaCluster();
+      return;
+    }
+
+    if (options.uninstall) {
+      await ollamaUninstall();
+      return;
+    }
+
+    // Default: show status
+    await ollamaStatus();
+  });
+
+// ═══════════════════════════════════════════════════════════════
 // PRIVACY COMMANDS
 // ═══════════════════════════════════════════════════════════════
 
@@ -661,6 +702,25 @@ program
     console.log(`║  Daily limit:      ${String(billing.dailyLimit).padEnd(17)}║`);
     console.log(`║  Usage:            ${(pct + "%").padEnd(17)}║`);
     console.log(`╚══════════════════════════════════════╝`);
+  });
+
+program
+  .command("account")
+  .description("👤 Manage your WabiSabi account")
+  .option("--register", "Create a new account")
+  .option("--profile", "View/edit your profile")
+  .option("--billing", "Billing, tokens and usage")
+  .option("--subscribe", "Manage subscription")
+  .action(async (cmdOpts: { register?: boolean; profile?: boolean; billing?: boolean; subscribe?: boolean }) => {
+    const { accountRegister, accountProfile, accountBilling, accountSubscribe, accountMenu } =
+      await import("./wizard/account-wizard.js");
+
+    if (cmdOpts.register) return accountRegister();
+    if (cmdOpts.profile) return accountProfile();
+    if (cmdOpts.billing) return accountBilling();
+    if (cmdOpts.subscribe) return accountSubscribe();
+    // No flag → interactive menu
+    return accountMenu();
   });
 
 program

@@ -105,16 +105,16 @@ export interface KeyEvent {
 // ── Layout Config ────────────────────────────────────────────
 
 export interface LayoutConfig {
-  headerHeight: 1;
-  inputHeight: 2;       // 1 input + 1 status bar
-  taskPanelWidth: 28;
+  headerHeight: number;
+  inputHeight: number;
+  taskPanelWidth: number;
   taskPanelVisible: boolean;
-  minWidth: 80;
-  minHeight: 24;
+  minWidth: number;
+  minHeight: number;
 }
 
 export const DEFAULT_LAYOUT: LayoutConfig = {
-  headerHeight: 1,
+  headerHeight: 3,
   inputHeight: 2,
   taskPanelWidth: 28,
   taskPanelVisible: true,

@@ -1,13 +1,17 @@
 /**
  * Header Bar Panel
  *
- * Single-row panel showing: agent type, model, provider, session, tokens.
+ * 3-row panel showing:
+ *   Row 1: WABI SABI branding (robot face + name + version)
+ *   Row 2: agent type, model, provider, session, tokens
+ *   Row 3: separator (drawn by engine)
  * Always visible at the top of the screen.
  */
 
 import { Panel } from "./panel.js";
 import { style, padAnsi, visibleLength } from "./ansi.js";
 import type { HeaderInfo } from "./types.js";
+import { showBannerCompact } from "./banner.js";
 import chalk from "chalk";
 
 export class HeaderBar extends Panel {
@@ -29,23 +33,27 @@ export class HeaderBar extends Panel {
 
   render(): string {
     const { x, y, width } = this._bounds;
+    let buf = "";
 
-    // Format token count
+    // ── Row 1: Branding ──
+    const banner = showBannerCompact();
+    buf += `\x1B[${y};${x}H`;
+    buf += style.bg.gray;
+    buf += padAnsi(` ${banner}`, width);
+    buf += style.reset;
+
+    // ── Row 2: Status bar ──
     const tokStr = this.formatTokens(this.info.tokens.total);
-
-    // Format context usage
     const ctxPct = Math.round(this.info.contextUsage * 100);
     const ctxColor = ctxPct > 75 ? chalk.red : ctxPct > 50 ? chalk.yellow : chalk.green;
     const ctxStr = ctxPct > 0 ? ctxColor(`${ctxPct}%`) : "";
 
-    // Build segments
     const agentSeg = chalk.bgCyan.black.bold(` ${this.info.agentIcon} ${this.info.agentLabel} `);
     const modelSeg = chalk.white(` ${this.info.model} `);
     const providerSeg = chalk.dim(`${this.info.provider}`);
     const sessionSeg = chalk.dim(`ses:${this.info.sessionId.slice(0, 6)}`);
     const tokenSeg = chalk.yellow(tokStr);
 
-    // Compose the bar
     const leftPart = `${agentSeg} ${modelSeg}${chalk.dim("│")} ${providerSeg}`;
     const rightPart = `${sessionSeg} ${chalk.dim("│")} ${tokenSeg}${ctxStr ? ` ${ctxStr}` : ""}`;
 
@@ -55,11 +63,15 @@ export class HeaderBar extends Panel {
 
     const fullBar = leftPart + " ".repeat(gap) + rightPart;
 
-    // Write with background
-    let buf = "";
-    buf += `\x1B[${y};${x}H`; // moveTo
+    buf += `\x1B[${y + 1};${x}H`;
     buf += style.bg.gray;
     buf += padAnsi(fullBar, width);
+    buf += style.reset;
+
+    // ── Row 3: Separator ──
+    buf += `\x1B[${y + 2};${x}H`;
+    buf += style.dim;
+    buf += "─".repeat(width);
     buf += style.reset;
 
     this._dirty = false;

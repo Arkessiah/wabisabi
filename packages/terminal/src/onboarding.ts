@@ -1,8 +1,9 @@
 /**
  * Onboarding & Setup Wizard
  *
- * First-run experience: interactive provider setup, connectivity test,
- * config generation. Also provides re-run via `wabisabi config --wizard`.
+ * First-run experience: language, provider strategy, Ollama setup,
+ * Substratum account, connectivity test. Rich 8-bit banner.
+ * Also re-runnable via `wabisabi config --wizard`.
  */
 
 import { existsSync, writeFileSync, mkdirSync } from "fs";
@@ -18,6 +19,7 @@ import {
   askMultipleNodes,
   testEndpoint,
 } from "./wizard/prompts.js";
+import { showBanner, showQuickStartGuide } from "./tui/banner.js";
 
 const WABISABI_DIR = join(homedir(), ".wabisabi");
 const CONFIG_FILE = join(WABISABI_DIR, "config.jsonc");
@@ -40,7 +42,7 @@ export function ensureConfigExample(): boolean {
   if (existsSync(CONFIG_FILE)) return false;
   try {
     mkdirSync(WABISABI_DIR, { recursive: true });
-    // BAJA-3: Restrict config file permissions
+    // BAJA-3: Restrict config permissions (user-only read/write)
     writeFileSync(CONFIG_FILE, JSON.stringify(configManager.getGlobal(), null, 2), {
       encoding: "utf-8",
       mode: 0o600,
@@ -51,86 +53,41 @@ export function ensureConfigExample(): boolean {
   }
 }
 
-// ── Banner ─────────────────────────────────────────────────────
+// ── Ollama Detection ──────────────────────────────────────────
 
-function showBanner(): void {
-  console.log(chalk.bold.cyan(`
-  ╔══════════════════════════════════════════════╗
-  ║     Welcome to WabiSabi Terminal IDE         ║
-  ║     AI-powered coding assistant              ║
-  ╚══════════════════════════════════════════════╝
-`));
-}
-
-function showQuickStart(): void {
-  console.log(chalk.bold("\n  Quick Start"));
-  console.log(chalk.dim("  ──────────────────────────────────"));
-  console.log("  Type your request and press Enter");
-  console.log("  Use /help for all commands");
-  console.log("  Use /tools to see available tools");
-  console.log("  Use /approve to auto-approve tool calls");
-  console.log("  Type exit to quit");
-  console.log(chalk.dim("  ──────────────────────────────────"));
-
-  console.log(chalk.bold("\n  Agents"));
-  console.log("  build   - Write and modify code (default)");
-  console.log("  plan    - Analyze and plan architecture");
-  console.log("  search  - Explore and find code");
-  console.log(chalk.dim("  Switch with: wabisabi agent <name>\n"));
+async function isOllamaInstalled(): Promise<boolean> {
+  try {
+    const proc = Bun.spawn(["which", "ollama"], { stdout: "pipe", stderr: "pipe" });
+    await proc.exited;
+    return proc.exitCode === 0;
+  } catch {
+    return false;
+  }
 }
 
 // ── Provider Setup ─────────────────────────────────────────────
 
-async function setupProviders(): Promise<ProvidersConfig> {
-  const mode = await askChoice("How do you want to use WabiSabi?", [
-    { value: "local", label: "Ollama local (single machine)" },
-    { value: "cluster", label: "Ollama cluster (multiple machines)" },
-    { value: "substratum", label: "Substratum only (cloud)" },
-    { value: "both", label: "Substratum + Ollama (recommended)" },
-  ]);
-
+async function setupProviders(strategy: string): Promise<ProvidersConfig> {
   let providers: ProvidersConfig;
 
-  if (mode === "local") {
-    const url = await askInput("Ollama URL", "http://localhost:11434");
-    providers = {
-      substratum: { enabled: false, url: "https://api.substratum.dev" },
-      ollama: {
-        mode: "local",
-        nodes: [{ name: "local", url, priority: 5 }],
-      },
-    };
-  } else if (mode === "cluster") {
-    console.log(chalk.dim("\n  Add your Ollama nodes (different machines):"));
-    const nodes = await askMultipleNodes();
-    providers = {
-      substratum: { enabled: false, url: "https://api.substratum.dev" },
-      ollama: { mode: "cluster", nodes },
-    };
-  } else if (mode === "substratum") {
-    const url = await askInput("Substratum URL", "https://api.substratum.dev");
-    const apiKey = await askInput("API Key (or press Enter to skip)");
-    providers = {
-      substratum: {
-        enabled: true,
-        url,
-        apiKey: apiKey || undefined,
-      },
-      ollama: { mode: "local", nodes: [] },
-    };
-  } else {
-    // both
-    const substratumUrl = await askInput("Substratum URL", "https://api.substratum.dev");
-    const apiKey = await askInput("Substratum API Key (or press Enter to skip)");
+  if (strategy === "local") {
+    // Ollama only
+    const hasOllama = await isOllamaInstalled();
+    if (!hasOllama) {
+      console.log(chalk.yellow("\n  Ollama is not installed."));
+      const install = await askConfirm("Install Ollama now?", true);
+      if (install) {
+        console.log(chalk.cyan("  Run: ") + chalk.bold("wabi ollama --install") + chalk.cyan(" after setup."));
+      }
+    }
 
-    const ollamaMode = await askChoice("Ollama setup:", [
+    const ollamaMode = await askChoice("Ollama mode:", [
       { value: "local", label: "Single local instance" },
       { value: "cluster", label: "Multiple machines (cluster)" },
     ]);
 
     let nodes: OllamaNode[];
     if (ollamaMode === "cluster") {
-      console.log(chalk.dim("\n  Add your Ollama nodes:"));
       nodes = await askMultipleNodes();
     } else {
       const url = await askInput("Ollama URL", "http://localhost:11434");
@@ -138,19 +95,76 @@ async function setupProviders(): Promise<ProvidersConfig> {
     }
 
     providers = {
-      substratum: {
-        enabled: true,
-        url: substratumUrl,
-        apiKey: apiKey || undefined,
-      },
-      ollama: {
-        mode: ollamaMode === "cluster" ? "cluster" : "local",
-        nodes,
-      },
+      substratum: { enabled: false, url: "https://api.substratum.dev" },
+      ollama: { mode: ollamaMode === "cluster" ? "cluster" : "local", nodes },
+    };
+  } else if (strategy === "cloud") {
+    // Substratum only
+    const url = await askInput("Substratum URL", "https://api.substratum.dev");
+    providers = {
+      substratum: { enabled: true, url },
+      ollama: { mode: "local", nodes: [] },
+    };
+  } else {
+    // Hybrid (local-first or cloud-first)
+    const substratumUrl = await askInput("Substratum URL", "https://api.substratum.dev");
+
+    const hasOllama = await isOllamaInstalled();
+    let nodes: OllamaNode[];
+    let ollamaMode: "local" | "cluster" = "local";
+
+    if (hasOllama) {
+      console.log(chalk.green("  ✓ Ollama detected"));
+      const mode = await askChoice("Ollama setup:", [
+        { value: "local", label: "Single local instance" },
+        { value: "cluster", label: "Multiple machines (cluster)" },
+      ]);
+      ollamaMode = mode === "cluster" ? "cluster" : "local";
+
+      if (ollamaMode === "cluster") {
+        nodes = await askMultipleNodes();
+      } else {
+        const url = await askInput("Ollama URL", "http://localhost:11434");
+        nodes = [{ name: "local", url, priority: 5 }];
+      }
+    } else {
+      console.log(chalk.yellow("  Ollama not installed. Run 'wabi ollama --install' later."));
+      const url = await askInput("Ollama URL (or skip)", "http://localhost:11434");
+      nodes = [{ name: "local", url, priority: 5 }];
+    }
+
+    providers = {
+      substratum: { enabled: true, url: substratumUrl },
+      ollama: { mode: ollamaMode, nodes },
     };
   }
 
   return providers;
+}
+
+// ── Account Setup ──────────────────────────────────────────────
+
+async function setupAccount(): Promise<void> {
+  const accountAction = await askChoice("Substratum account:", [
+    { value: "login", label: "Login with existing account" },
+    { value: "register", label: "Create new account (opens browser)" },
+    { value: "apikey", label: "Use API key" },
+    { value: "skip", label: "Skip for now" },
+  ]);
+
+  if (accountAction === "login") {
+    console.log(chalk.cyan("\n  Run: ") + chalk.bold("wabi login") + chalk.cyan(" to authenticate.\n"));
+  } else if (accountAction === "register") {
+    console.log(chalk.cyan("\n  Run: ") + chalk.bold("wabi account --register") + chalk.cyan(" to create your account.\n"));
+  } else if (accountAction === "apikey") {
+    const key = await askInput("API Key");
+    if (key) {
+      const providers = configManager.getProviders();
+      providers.substratum.apiKey = key;
+      configManager.update("providers", providers, "global");
+      console.log(chalk.green("  ✓ API key saved"));
+    }
+  }
 }
 
 // ── Connectivity Test ──────────────────────────────────────────
@@ -158,7 +172,6 @@ async function setupProviders(): Promise<ProvidersConfig> {
 async function testConnectivity(providers: ProvidersConfig): Promise<void> {
   console.log(chalk.dim("\n  Testing connectivity...\n"));
 
-  // Test Substratum
   if (providers.substratum.enabled) {
     const result = await testEndpoint(providers.substratum.url, "/v1/models");
     if (result.ok) {
@@ -171,7 +184,6 @@ async function testConnectivity(providers: ProvidersConfig): Promise<void> {
     }
   }
 
-  // Test Ollama nodes
   for (const node of providers.ollama.nodes) {
     const result = await testEndpoint(node.url, "/api/tags");
     if (result.ok) {
@@ -188,42 +200,95 @@ async function testConnectivity(providers: ProvidersConfig): Promise<void> {
 // ── Main Onboarding Flow ───────────────────────────────────────
 
 export async function runOnboarding(): Promise<void> {
-  showBanner();
+  // 1. Banner
+  console.log(showBanner());
 
-  // Skip interactive setup if env indicates non-interactive
+  // Skip interactive if env set
   if (process.env.WABISABI_SKIP_ONBOARDING) {
     ensureConfigExample();
     markOnboarded();
     return;
   }
 
-  // Interactive provider setup
-  const providers = await setupProviders();
+  // 2. Language
+  const locale = await askChoice("Select language / Selecciona idioma:", [
+    { value: "en", label: "English" },
+    { value: "es", label: "Espanol" },
+    { value: "auto", label: "Auto-detect (system locale)" },
+  ]);
+  configManager.update("locale", locale, "global");
 
-  // Test connectivity
-  await testConnectivity(providers);
+  // 3. Provider Strategy
+  const strategy = await askChoice(
+    locale === "es"
+      ? "Como quieres usar los modelos de IA?"
+      : "How do you want to use AI models?",
+    [
+      {
+        value: "hybrid-local-first",
+        label: locale === "es"
+          ? "Hibrido: Ollama para lo simple, Substratum para lo complejo (recomendado)"
+          : "Hybrid: Ollama for simple tasks, Substratum for complex (recommended)",
+      },
+      {
+        value: "hybrid-cloud-first",
+        label: locale === "es"
+          ? "Hibrido: Substratum primario, Ollama como respaldo"
+          : "Hybrid: Substratum primary, Ollama fallback",
+      },
+      {
+        value: "local",
+        label: locale === "es"
+          ? "Solo local (Ollama) - Privado, gratis, requiere GPU"
+          : "Local only (Ollama) - Private, free, requires GPU",
+      },
+      {
+        value: "cloud",
+        label: locale === "es"
+          ? "Solo nube (Substratum) - Modelos potentes, consume tokens"
+          : "Cloud only (Substratum) - Powerful models, costs tokens",
+      },
+    ],
+  );
+  configManager.update("providerStrategy", strategy, "global");
 
-  // Select model
-  const model = await askInput("Default model", "llama3.2");
+  // 4. Provider setup based on strategy
+  const providers = await setupProviders(strategy);
 
-  // Save config
+  // 5. Account setup (if using Substratum)
+  if (strategy !== "local") {
+    await setupAccount();
+  }
+
+  // 6. Default model
+  const modelSuggestion = strategy === "cloud" ? "gpt-4o" : "llama3.2";
+  const model = await askInput(
+    locale === "es" ? "Modelo por defecto" : "Default model",
+    modelSuggestion,
+  );
+
+  // 7. Save config
   configManager.update("providers", providers, "global");
   configManager.update("model", model, "global");
   ensureConfigExample();
 
-  console.log(chalk.green(`\n  ✓ Configuration saved to ${CONFIG_FILE}`));
-  console.log(chalk.dim(`  Run 'wabisabi config --wizard' anytime to change settings.\n`));
+  // 8. Test connectivity
+  await testConnectivity(providers);
 
-  showQuickStart();
+  // 9. Summary
+  console.log(chalk.green(`\n  ✓ ${locale === "es" ? "Configuracion guardada" : "Configuration saved"}`));
+  console.log(chalk.dim(`    ${CONFIG_FILE}\n`));
+
+  console.log(showQuickStartGuide());
   markOnboarded();
 }
 
 /**
  * Re-run provider setup (called from `wabisabi config --wizard`).
- * Does not show banner or quick-start.
  */
 export async function runProviderSetup(): Promise<void> {
-  const providers = await setupProviders();
+  const strategy = configManager.getMerged().providerStrategy || "hybrid-local-first";
+  const providers = await setupProviders(strategy);
   await testConnectivity(providers);
 
   const model = await askInput("Default model", configManager.getGlobal().model);

@@ -50,6 +50,10 @@ export const ProvidersSchema = z.object({
 
 export const GlobalConfigSchema = z.object({
   model: z.string().default("llama3.2"),
+  locale: z.enum(["en", "es", "auto"]).default("auto"),
+  providerStrategy: z
+    .enum(["local", "cloud", "hybrid-local-first", "hybrid-cloud-first"])
+    .default("hybrid-local-first"),
   // Legacy fields (backward-compat, migrated to providers on load)
   substratum: z.string().optional(),
   ollama: z.string().optional(),

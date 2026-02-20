@@ -93,9 +93,9 @@ export class ScreenManager {
     const taskWidth = this._layout.taskPanelVisible ? this._layout.taskPanelWidth : 0;
     return {
       x: 1,
-      y: this._layout.headerHeight + 1, // below header + separator
+      y: this._layout.headerHeight + 1, // below header (which includes its own separator)
       width: this._cols - taskWidth - (taskWidth > 0 ? 1 : 0), // -1 for vertical divider
-      height: this._rows - this._layout.headerHeight - this._layout.inputHeight - 2, // -2 for separators
+      height: this._rows - this._layout.headerHeight - this._layout.inputHeight - 1, // -1 for input separator
     };
   }
 
