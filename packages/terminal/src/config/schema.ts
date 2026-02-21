@@ -52,7 +52,15 @@ export const GlobalConfigSchema = z.object({
   model: z.string().default("llama3.2"),
   locale: z.enum(["en", "es", "auto"]).default("auto"),
   providerStrategy: z
-    .enum(["local", "cloud", "hybrid-local-first", "hybrid-cloud-first"])
+    .enum([
+      "local",           // Ollama only (single instance)
+      "cluster",         // Ollama cluster only
+      "cloud",           // Substratum only
+      "cluster-cloud",   // Cluster + Substratum
+      "hybrid-local-first",   // Local Ollama + Substratum (local preferred)
+      "hybrid-cloud-first",   // Substratum + Local Ollama (cloud preferred)
+      "hybrid-full",          // Local + Cluster + Substratum (distribute load)
+    ])
     .default("hybrid-local-first"),
   // Legacy fields (backward-compat, migrated to providers on load)
   substratum: z.string().optional(),

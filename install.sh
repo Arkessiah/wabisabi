@@ -2,7 +2,8 @@
 #
 # WabiSabi Installer
 #
-# Installs wabisabi as a global command.
+# Installs wabisabi as a global command on macOS and Linux.
+# Detects the user's shell, asks before modifying config files.
 # Requirements: Bun runtime (https://bun.sh)
 #
 
@@ -21,28 +22,72 @@ BIN_DIR="$HOME/.local/bin"
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 TERMINAL_DIR="$REPO_DIR/packages/terminal"
 
-info()  { echo -e "  ${CYAN}>${RESET} $1"; }
-ok()    { echo -e "  ${GREEN}+${RESET} $1"; }
-warn()  { echo -e "  ${YELLOW}!${RESET} $1"; }
-fail()  { echo -e "  ${RED}x${RESET} $1"; exit 1; }
+info()    { echo -e "  ${CYAN}>${RESET} $1"; }
+ok()      { echo -e "  ${GREEN}+${RESET} $1"; }
+warn()    { echo -e "  ${YELLOW}!${RESET} $1"; }
+fail()    { echo -e "  ${RED}x${RESET} $1"; exit 1; }
+confirm() {
+  local msg="$1" default="${2:-y}"
+  local hint="Y/n"
+  [ "$default" = "n" ] && hint="y/N"
+  echo -ne "  ${msg} ${DIM}[${hint}]${RESET} "
+  read -r answer
+  answer="${answer:-$default}"
+  case "$answer" in
+    y|Y|yes|si|s) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 echo ""
 echo -e "  ${BOLD}WabiSabi Installer${RESET}"
 echo -e "  ${DIM}AI Terminal IDE${RESET}"
 echo ""
 
+# ── Detect OS ────────────────────────────────────────────────
+
+OS="$(uname -s)"
+case "$OS" in
+  Darwin)  PLATFORM="macos" ;;
+  Linux)   PLATFORM="linux" ;;
+  MINGW*|MSYS*|CYGWIN*)
+    fail "Windows detected. Use install.ps1 instead: powershell -File install.ps1"
+    ;;
+  *)
+    warn "Unknown OS: $OS - proceeding as Linux"
+    PLATFORM="linux"
+    ;;
+esac
+
+ok "Platform: $PLATFORM ($(uname -m))"
+
 # ── Check Bun ────────────────────────────────────────────────
 
-if ! command -v bun &>/dev/null; then
-  if [ -x "$HOME/.bun/bin/bun" ]; then
-    export PATH="$HOME/.bun/bin:$PATH"
-  else
-    fail "Bun not found. Install it: curl -fsSL https://bun.sh/install | bash"
-  fi
+BUN_PATH=""
+
+if command -v bun &>/dev/null; then
+  BUN_PATH="$(command -v bun)"
+elif [ -x "$HOME/.bun/bin/bun" ]; then
+  BUN_PATH="$HOME/.bun/bin/bun"
+  export PATH="$HOME/.bun/bin:$PATH"
 fi
 
-BUN_PATH="$(command -v bun)"
-ok "Bun found: $BUN_PATH ($(bun --version))"
+if [ -z "$BUN_PATH" ]; then
+  warn "Bun runtime not found."
+  if confirm "Install Bun now?"; then
+    curl -fsSL https://bun.sh/install | bash
+    export PATH="$HOME/.bun/bin:$PATH"
+    BUN_PATH="$(command -v bun || echo "$HOME/.bun/bin/bun")"
+    if [ ! -x "$BUN_PATH" ]; then
+      fail "Bun installation failed. Install manually: https://bun.sh"
+    fi
+    ok "Bun installed: $BUN_PATH"
+  else
+    fail "Bun is required. Install it: curl -fsSL https://bun.sh/install | bash"
+  fi
+else
+  ok "Bun found: $BUN_PATH ($($BUN_PATH --version))"
+fi
 
 # ── Build ────────────────────────────────────────────────────
 
@@ -53,17 +98,17 @@ if [ ! -d "$TERMINAL_DIR" ]; then
 fi
 
 cd "$TERMINAL_DIR"
-bun install --frozen-lockfile 2>/dev/null || bun install
-bun build src/index.ts --outfile dist/index.js --target bun
+"$BUN_PATH" install --frozen-lockfile 2>/dev/null || "$BUN_PATH" install
+"$BUN_PATH" build src/index.ts --outfile dist/index.js --target bun
 
 ok "Built successfully"
 
-# ── Create global directories ────────────────────────────────
+# ── Create directories ───────────────────────────────────────
 
 mkdir -p "$WABISABI_DIR"
 mkdir -p "$BIN_DIR"
 
-# ── Create launcher script ───────────────────────────────────
+# ── Create launcher ──────────────────────────────────────────
 
 LAUNCHER="$BIN_DIR/wabisabi"
 
@@ -74,41 +119,119 @@ exec "${BUN_PATH}" "${TERMINAL_DIR}/dist/index.js" "\$@"
 LAUNCHER_EOF
 
 chmod +x "$LAUNCHER"
-ok "Launcher created: $LAUNCHER"
+ok "Launcher: $LAUNCHER"
 
-# ── Ensure PATH includes ~/.local/bin ────────────────────────
+# ── Detect shell and config file ─────────────────────────────
 
-SHELL_NAME="$(basename "$SHELL")"
-PROFILE_FILE=""
+detect_shell_config() {
+  # Check $SHELL first, then look at what's actually running
+  local shell_name
+  shell_name="$(basename "${SHELL:-/bin/bash}")"
 
-case "$SHELL_NAME" in
-  zsh)  PROFILE_FILE="$HOME/.zshrc" ;;
-  bash) PROFILE_FILE="$HOME/.bashrc" ;;
-  fish) PROFILE_FILE="$HOME/.config/fish/config.fish" ;;
-esac
+  local config_file=""
+  local path_line=""
 
-if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
-  if [ -n "$PROFILE_FILE" ] && [ -f "$PROFILE_FILE" ]; then
-    if ! grep -q "\.local/bin" "$PROFILE_FILE" 2>/dev/null; then
-      echo "" >> "$PROFILE_FILE"
-      echo "# WabiSabi" >> "$PROFILE_FILE"
-      echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$PROFILE_FILE"
-      ok "Added ~/.local/bin to PATH in $PROFILE_FILE"
-      warn "Run: source $PROFILE_FILE (or open a new terminal)"
-    fi
+  case "$shell_name" in
+    zsh)
+      # zsh: prefer .zshrc, fall back to .zprofile
+      if [ -f "$HOME/.zshrc" ]; then
+        config_file="$HOME/.zshrc"
+      elif [ -f "$HOME/.zprofile" ]; then
+        config_file="$HOME/.zprofile"
+      else
+        config_file="$HOME/.zshrc"
+      fi
+      path_line='export PATH="$HOME/.local/bin:$PATH"'
+      ;;
+    bash)
+      # bash: prefer .bashrc (interactive), fall back to .bash_profile (login)
+      if [ "$PLATFORM" = "macos" ]; then
+        # macOS bash uses .bash_profile for login shells (Terminal.app)
+        if [ -f "$HOME/.bash_profile" ]; then
+          config_file="$HOME/.bash_profile"
+        elif [ -f "$HOME/.bashrc" ]; then
+          config_file="$HOME/.bashrc"
+        else
+          config_file="$HOME/.bash_profile"
+        fi
+      else
+        if [ -f "$HOME/.bashrc" ]; then
+          config_file="$HOME/.bashrc"
+        elif [ -f "$HOME/.bash_profile" ]; then
+          config_file="$HOME/.bash_profile"
+        else
+          config_file="$HOME/.bashrc"
+        fi
+      fi
+      path_line='export PATH="$HOME/.local/bin:$PATH"'
+      ;;
+    fish)
+      config_file="$HOME/.config/fish/config.fish"
+      path_line='set -gx PATH $HOME/.local/bin $PATH'
+      ;;
+    *)
+      warn "Unknown shell: $shell_name"
+      config_file=""
+      path_line=""
+      ;;
+  esac
+
+  echo "$shell_name|$config_file|$path_line"
+}
+
+SHELL_INFO="$(detect_shell_config)"
+SHELL_NAME="$(echo "$SHELL_INFO" | cut -d'|' -f1)"
+CONFIG_FILE="$(echo "$SHELL_INFO" | cut -d'|' -f2)"
+PATH_LINE="$(echo "$SHELL_INFO" | cut -d'|' -f3)"
+
+ok "Shell: $SHELL_NAME"
+
+# ── Add to PATH (with confirmation) ─────────────────────────
+
+PATH_ADDED=false
+
+if [[ ":$PATH:" == *":$BIN_DIR:"* ]]; then
+  ok "~/.local/bin already in PATH"
+  PATH_ADDED=true
+elif [ -n "$CONFIG_FILE" ] && [ -n "$PATH_LINE" ]; then
+  # Check if already configured
+  if [ -f "$CONFIG_FILE" ] && grep -q '\.local/bin' "$CONFIG_FILE" 2>/dev/null; then
+    ok "PATH entry already in $CONFIG_FILE"
+    PATH_ADDED=true
   else
-    warn "Add ~/.local/bin to your PATH manually"
+    echo ""
+    info "wabisabi needs to be in your PATH to work as a command."
+    info "This will add one line to: ${BOLD}$CONFIG_FILE${RESET}"
+    echo -e "  ${DIM}Line: $PATH_LINE${RESET}"
+    echo ""
+
+    if confirm "Add wabisabi to your PATH?"; then
+      # Append safely - only add the PATH line, nothing else
+      {
+        echo ""
+        echo "# WabiSabi CLI"
+        echo "$PATH_LINE"
+      } >> "$CONFIG_FILE"
+
+      ok "Added to $CONFIG_FILE"
+      PATH_ADDED=true
+    else
+      warn "Skipped. Add manually: $PATH_LINE"
+    fi
   fi
 else
-  ok "~/.local/bin already in PATH"
+  warn "Could not detect shell config. Add to PATH manually:"
+  echo -e "  ${DIM}export PATH=\"\$HOME/.local/bin:\$PATH\"${RESET}"
 fi
 
 # ── Verify ───────────────────────────────────────────────────
 
+echo ""
 if command -v wabisabi &>/dev/null; then
-  ok "wabisabi command is available"
-else
-  info "wabisabi will be available after reloading your shell"
+  ok "wabisabi command is ready"
+elif $PATH_ADDED; then
+  info "Run to activate: ${BOLD}source $CONFIG_FILE${RESET}"
+  info "Or open a new terminal window."
 fi
 
 # ── Done ─────────────────────────────────────────────────────
@@ -117,7 +240,7 @@ echo ""
 echo -e "  ${GREEN}${BOLD}Installation complete${RESET}"
 echo ""
 echo -e "  ${DIM}Usage:${RESET}"
-echo -e "    ${CYAN}wabisabi${RESET}              Start interactive mode"
+echo -e "    ${CYAN}wabisabi${RESET}                  Start interactive mode"
 echo -e "    ${CYAN}wabisabi config --wizard${RESET}  Configure providers"
-echo -e "    ${CYAN}wabisabi --help${RESET}        Show all commands"
+echo -e "    ${CYAN}wabisabi --help${RESET}            Show all commands"
 echo ""
