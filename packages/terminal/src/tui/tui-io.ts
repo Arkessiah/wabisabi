@@ -15,6 +15,7 @@ import type {
 import type { ActiveTask, PinnedItem } from "../ram/schema.js";
 import { TuiEngine } from "./index.js";
 import { agentSwitcher, AGENTS } from "../services/agent-switcher.js";
+import { configManager } from "../config/index.js";
 import { showSplash } from "./banner.js";
 import chalk from "chalk";
 
@@ -68,17 +69,23 @@ export class TuiTerminalIO implements TerminalIO {
     // Wire Ctrl+P -> command palette
     this.engine.onPalette(async () => {
       const currentInfo = agentSwitcher.getInfo();
+      const merged = configManager.getMerged();
+      const providers = configManager.getProviders();
       const items = TuiTerminalIO.buildPaletteItems({
         currentAgent: currentInfo.type,
-        currentModel: "llama3.2",
-        currentProvider: "ollama",
+        currentModel: merged.model || "llama3.2",
+        currentProvider: merged.providerStrategy || "hybrid-local-first",
         tokens: { prompt: 0, completion: 0, total: 0 },
         contextUsage: 0,
+        providers,
+        providerStrategy: merged.providerStrategy || "hybrid-local-first",
       });
       const result = await this.openCommandPalette(items);
       if (result) {
         if (result.section === "agents") {
           agentSwitcher.set(result.itemId as any);
+        } else if (result.section === "strategies") {
+          configManager.update("providerStrategy", result.itemId, "global");
         }
       }
     });
@@ -168,6 +175,8 @@ export class TuiTerminalIO implements TerminalIO {
     tokens: { prompt: number; completion: number; total: number };
     contextUsage: number;
     availableModels?: string[];
+    providers?: import("../config/schema.js").ProvidersConfig;
+    providerStrategy?: string;
   }): PaletteItem[] {
     const items: PaletteItem[] = [];
 
@@ -193,6 +202,48 @@ export class TuiTerminalIO implements TerminalIO {
       });
     }
 
+    // Provider strategy section
+    const strategies = [
+      { id: "local", label: "Ollama Local", desc: "Single instance, private" },
+      { id: "cluster", label: "Ollama Cluster", desc: "Multiple machines" },
+      { id: "cloud", label: "Substratum Cloud", desc: "Powerful models, costs tokens" },
+      { id: "cluster-cloud", label: "Cluster + Cloud", desc: "Cluster with cloud fallback" },
+      { id: "hybrid-local-first", label: "Local + Cloud", desc: "Local preferred, cloud for complex" },
+      { id: "hybrid-cloud-first", label: "Cloud + Local", desc: "Cloud preferred, local fallback" },
+      { id: "hybrid-full", label: "Full Hybrid", desc: "Local + Cluster + Cloud" },
+    ];
+
+    for (const s of strategies) {
+      items.push({
+        id: s.id,
+        label: s.label,
+        description: s.desc,
+        active: s.id === opts.providerStrategy,
+        section: "strategies",
+      });
+    }
+
+    // Providers status section
+    if (opts.providers) {
+      const p = opts.providers;
+      if (p.substratum.enabled) {
+        items.push({
+          id: "substratum",
+          label: `Substratum: ${p.substratum.url}`,
+          description: p.substratum.apiKey ? "API key configured" : "No API key",
+          section: "providers",
+        });
+      }
+      for (const node of p.ollama.nodes) {
+        items.push({
+          id: `ollama-${node.name}`,
+          label: `Ollama: ${node.name} (${node.url})`,
+          description: `Priority: ${node.priority}${node.gpu ? ` [${node.gpu}]` : ""}`,
+          section: "providers",
+        });
+      }
+    }
+
     // Token stats section
     const { prompt, completion, total } = opts.tokens;
     const ctxPct = Math.round(opts.contextUsage * 100);
@@ -216,15 +267,6 @@ export class TuiTerminalIO implements TerminalIO {
       label: `Context: ${ctxPct}% used`,
       description: ctxPct > 75 ? "WARNING" : ctxPct > 50 ? "moderate" : "ok",
       section: "tokens",
-    });
-
-    // Provider section
-    items.push({
-      id: "provider-current",
-      label: opts.currentProvider,
-      description: "Active provider",
-      active: true,
-      section: "providers",
     });
 
     return items;

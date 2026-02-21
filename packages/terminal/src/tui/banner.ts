@@ -14,8 +14,8 @@ const G = chalk.gray;         // robot body
 const D = chalk.dim;          // dark details
 const W = chalk.white;        // highlights
 const O = chalk.hex("#FF6600"); // orange accent (hoodie logo)
-const B = chalk.blue;         // WABI text
-const M = chalk.magenta;      // SABI text
+const GR = chalk.gray;        // WABI text (gray)
+const OT = chalk.hex("#FF6600"); // SABI text (orange)
 
 // ── 8-bit Robot (bigger, pixel-art style) ───────────────────
 // Hoodie bot with dark visor, glowing red eyes, sneakers
@@ -44,21 +44,24 @@ function colorizeRobot(): string[] {
 }
 
 // ── WABISABI unified block text ─────────────────────────────
-// One word, big, flat style (no 3D shadow), gradient blue->magenta
+// Flat style, fixed-width letters (W7 A7 B7 I2 · S7 A7 B7 I2)
+// WABI = gray, SABI = orange
 
 const WABISABI_LINES = [
   "██   ██  █████  ██████  ██ ███████  █████  ██████  ██",
   "██   ██ ██   ██ ██   ██ ██ ██      ██   ██ ██   ██ ██",
   "██ █ ██ ███████ ██████  ██ ███████ ███████ ██████  ██",
-  "██████  ██   ██ ██   ██ ██      ██ ██   ██ ██   ██ ██",
-  " ███ ██ ██   ██ ██████  ██ ███████ ██   ██ ██████  ██",
+  "███ ███ ██   ██ ██   ██ ██      ██ ██   ██ ██   ██ ██",
+  " █   █  ██   ██ ██████  ██ ███████ ██   ██ ██████  ██",
 ];
 
 function colorizeWabisabi(): string[] {
-  // Gradient from blue to magenta across each line
+  // WABI = first 26 chars (W+A+B+I), SABI = last 26 chars (S+A+B+I)
   return WABISABI_LINES.map((line) => {
-    const mid = Math.floor(line.length / 2);
-    return B(line.slice(0, mid)) + M(line.slice(mid));
+    const wabi = line.slice(0, 26);
+    const gap = line.slice(26, 27);
+    const sabi = line.slice(27);
+    return GR(wabi) + gap + OT(sabi);
   });
 }
 
@@ -132,7 +135,7 @@ export function showSplash(info: {
  */
 export function showBannerCompact(): string {
   const face = G("[") + R("··") + G("]");
-  const name = B.bold("WABI") + M.bold("SABI");
+  const name = GR.bold("WABI") + OT.bold("SABI");
   const ver = D("v1.0.0");
   return `${face} ${name} ${ver}`;
 }
@@ -142,7 +145,7 @@ export function showBannerCompact(): string {
  */
 export function showBannerMini(): { line1: string; line2: string } {
   const face = G("[") + R("··") + G("]");
-  const name = B.bold("WABI") + M.bold("SABI");
+  const name = GR.bold("WABI") + OT.bold("SABI");
   const ver = D("v1.0.0");
   return {
     line1: `${face} ${name} ${ver}`,
@@ -169,8 +172,8 @@ export function showQuickStartGuide(): string {
   lines.push(D("  " + "-".repeat(45)));
   lines.push("");
   lines.push(chalk.bold("  Agents"));
-  lines.push("  " + B("build") + "   Write and modify code " + D("(default)"));
-  lines.push("  " + M("plan") + "    Analyze and plan architecture");
+  lines.push("  " + GR("build") + "   Write and modify code " + D("(default)"));
+  lines.push("  " + OT("plan") + "    Analyze and plan architecture");
   lines.push("  " + chalk.cyan("search") + "  Explore and find code");
   lines.push("");
 

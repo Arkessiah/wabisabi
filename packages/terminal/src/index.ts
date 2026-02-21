@@ -92,6 +92,12 @@ program
   .option("--agent <type>", "Agent to use (build, plan, search)", "build")
   .option("--trust", "Trust current directory without prompting")
   .action(async (cmdOpts: { agent?: string; trust?: boolean }) => {
+    // First-run onboarding
+    const { isFirstRun, runOnboarding } = await import("./onboarding.js");
+    if (isFirstRun()) {
+      await runOnboarding();
+    }
+
     // Workspace trust check
     const cwd = process.cwd();
     if (cmdOpts.trust) {
