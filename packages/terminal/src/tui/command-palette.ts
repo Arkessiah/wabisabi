@@ -15,6 +15,7 @@ export class CommandPalette {
   private filtered: PaletteItem[] = [];
   private searchQuery = "";
   private selectedIndex = 0;
+  private scrollOffset = 0;
   private bounds: Bounds = { x: 10, y: 5, width: 60, height: 20 };
   private _resolve: ((result: PaletteResult | null) => void) | null = null;
   private _savedRegion = ""; // Not used directly, alternate screen handles this
@@ -25,6 +26,7 @@ export class CommandPalette {
     this.filtered = items;
     this.searchQuery = "";
     this.selectedIndex = 0;
+    this.scrollOffset = 0;
     this.bounds = bounds;
 
     return new Promise((resolve) => {
@@ -113,38 +115,62 @@ export class CommandPalette {
     // Separator
     buf += cursor.moveTo(y + 2, x + 1) + chalk.dim("─".repeat(width - 2));
 
-    // Items
+    // Build all visual rows (section headers + items)
     const contentH = height - 4; // -2 border -1 search -1 separator
+
+    type VisualRow = { type: "section"; title: string } | { type: "item"; index: number; item: PaletteItem };
+    const rows: VisualRow[] = [];
     let currentSection = "";
-    let row = 0;
+    let selectedVisualRow = 0;
 
-    for (let i = 0; i < this.filtered.length && row < contentH; i++) {
+    for (let i = 0; i < this.filtered.length; i++) {
       const item = this.filtered[i];
-
-      // Section header
       if (item.section !== currentSection) {
         currentSection = item.section;
-        const sectionTitle = currentSection.charAt(0).toUpperCase() + currentSection.slice(1);
-        buf += cursor.moveTo(y + 3 + row, x + 1) + chalk.bold.cyan(` ${sectionTitle}`);
-        buf += " ".repeat(Math.max(0, width - sectionTitle.length - 4));
-        row++;
-        if (row >= contentH) break;
+        rows.push({ type: "section", title: currentSection.charAt(0).toUpperCase() + currentSection.slice(1) });
       }
+      if (i === this.selectedIndex) selectedVisualRow = rows.length;
+      rows.push({ type: "item", index: i, item });
+    }
 
-      // Item
-      const isSelected = i === this.selectedIndex;
-      const prefix = isSelected ? chalk.cyan("▶") : " ";
-      const icon = item.icon || " ";
-      const activeMarker = item.active ? chalk.green(" ✓") : "";
-      const label = `${prefix} ${icon} ${item.label}${activeMarker}`;
-      const desc = item.description ? chalk.dim(` ${item.description}`) : "";
+    // Adjust scroll so selected item is always visible
+    if (selectedVisualRow < this.scrollOffset) {
+      this.scrollOffset = selectedVisualRow;
+    } else if (selectedVisualRow >= this.scrollOffset + contentH) {
+      this.scrollOffset = selectedVisualRow - contentH + 1;
+    }
 
-      const line = isSelected
-        ? style.bg.gray + padAnsi(`${label}${desc}`, width - 2) + style.reset
-        : padAnsi(`${label}${desc}`, width - 2);
+    // Render visible rows
+    const visibleEnd = Math.min(rows.length, this.scrollOffset + contentH);
+    let row = 0;
+    for (let vi = this.scrollOffset; vi < visibleEnd; vi++) {
+      const vr = rows[vi];
+      if (vr.type === "section") {
+        buf += cursor.moveTo(y + 3 + row, x + 1) + chalk.bold.cyan(` ${vr.title}`);
+        buf += " ".repeat(Math.max(0, width - vr.title.length - 4));
+      } else {
+        const isSelected = vr.index === this.selectedIndex;
+        const prefix = isSelected ? chalk.cyan("▶") : " ";
+        const icon = vr.item.icon || " ";
+        const activeMarker = vr.item.active ? chalk.green(" ✓") : "";
+        const label = `${prefix} ${icon} ${vr.item.label}${activeMarker}`;
+        const desc = vr.item.description ? chalk.dim(` ${vr.item.description}`) : "";
 
-      buf += cursor.moveTo(y + 3 + row, x + 1) + line;
+        const line = isSelected
+          ? style.bg.gray + padAnsi(`${label}${desc}`, width - 2) + style.reset
+          : padAnsi(`${label}${desc}`, width - 2);
+
+        buf += cursor.moveTo(y + 3 + row, x + 1) + line;
+      }
       row++;
+    }
+
+    // Scroll indicators
+    if (this.scrollOffset > 0) {
+      buf += cursor.moveTo(y + 3, x + width - 2) + chalk.cyan("▲");
+    }
+    if (visibleEnd < rows.length) {
+      buf += cursor.moveTo(y + 2 + contentH, x + width - 2) + chalk.cyan("▼");
     }
 
     // Fill remaining rows
@@ -167,6 +193,7 @@ export class CommandPalette {
       );
     }
     this.selectedIndex = Math.min(this.selectedIndex, Math.max(0, this.filtered.length - 1));
+    this.scrollOffset = 0;
   }
 
   private close(result: PaletteResult | null): void {
