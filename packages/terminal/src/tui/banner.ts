@@ -135,7 +135,7 @@ export function showSplash(info: {
  */
 export function showBannerCompact(): string {
   const face = G("[") + R("··") + G("]");
-  const name = GR.bold("WABI") + OT.bold("SABI");
+  const name = OT.bold("WABI") + W.bold("SABI");
   const ver = D("v1.0.0");
   return `${face} ${name} ${ver}`;
 }
@@ -145,7 +145,7 @@ export function showBannerCompact(): string {
  */
 export function showBannerMini(): { line1: string; line2: string } {
   const face = G("[") + R("··") + G("]");
-  const name = GR.bold("WABI") + OT.bold("SABI");
+  const name = OT.bold("WABI") + W.bold("SABI");
   const ver = D("v1.0.0");
   return {
     line1: `${face} ${name} ${ver}`,

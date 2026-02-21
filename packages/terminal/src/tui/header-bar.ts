@@ -48,13 +48,13 @@ export class HeaderBar extends Panel {
     const ctxStr = ctxPct > 0 ? ctxColor(`${ctxPct}%`) : "";
 
     const agentSeg = chalk.bgCyan.black.bold(` ${this.info.agentLabel} `);
-    const modelSeg = chalk.white(` ${this.info.model} `);
-    const providerSeg = chalk.dim(`${this.info.provider}`);
-    const sessionSeg = chalk.dim(`ses:${this.info.sessionId.slice(0, 6)}`);
-    const tokenSeg = chalk.yellow(tokStr);
+    const modelSeg = chalk.white.bold(` ${this.info.model} `);
+    const providerSeg = chalk.white(`${this.info.provider}`);
+    const sessionSeg = chalk.white(`ses:${this.info.sessionId.slice(0, 6)}`);
+    const tokenSeg = chalk.yellow.bold(tokStr);
 
-    const leftPart = `${agentSeg} ${modelSeg}${chalk.dim("│")} ${providerSeg}`;
-    const rightPart = `${sessionSeg} ${chalk.dim("│")} ${tokenSeg}${ctxStr ? ` ${ctxStr}` : ""}`;
+    const leftPart = `${agentSeg} ${modelSeg}${chalk.white("│")} ${providerSeg}`;
+    const rightPart = `${sessionSeg} ${chalk.white("│")} ${tokenSeg}${ctxStr ? ` ${ctxStr}` : ""}`;
 
     const leftLen = visibleLength(leftPart);
     const rightLen = visibleLength(rightPart);
