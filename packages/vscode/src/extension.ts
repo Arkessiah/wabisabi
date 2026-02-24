@@ -8,7 +8,9 @@
 import * as vscode from "vscode";
 import { ChatProvider } from "./chat-provider";
 import { AgentsProvider } from "./agents-provider";
+import { TasksProvider } from "./tasks-provider";
 import { StatusBarManager } from "./status-bar";
+import { InlineCompletionProvider } from "./inline-completion";
 import { WabiSabiConfig } from "./config";
 import { checkFirstRun } from "./onboarding";
 
@@ -28,6 +30,13 @@ export function activate(context: vscode.ExtensionContext) {
   const agentsProvider = new AgentsProvider(config);
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("wabisabi.agents", agentsProvider)
+  );
+
+  // Tasks tree
+  const tasksProvider = new TasksProvider();
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider("wabisabi.tasks", tasksProvider),
+    { dispose: () => tasksProvider.dispose() }
   );
 
   // Commands
@@ -124,6 +133,12 @@ export function activate(context: vscode.ExtensionContext) {
       const selection = editor.document.getText(editor.selection);
       chatProvider.sendMessage(`Review this code:\n\`\`\`\n${selection}\n\`\`\``);
     })
+  );
+
+  // Inline completions (Copilot-style)
+  const inlineProvider = new InlineCompletionProvider(config);
+  context.subscriptions.push(
+    vscode.languages.registerInlineCompletionItemProvider({ pattern: "**" }, inlineProvider)
   );
 
   // Status bar

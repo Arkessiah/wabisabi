@@ -4,23 +4,69 @@
   "description": "WabiSabi AI coding agent for VS Code",
   "version": "0.1.0",
   "publisher": "wabisabi",
-  "engines": { "vscode": "^1.85.0" },
-  "categories": ["Programming Languages", "Machine Learning", "Other"],
-  "activationEvents": ["onStartupFinished"],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Machine Learning",
+    "Other"
+  ],
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Arkessiah/wabisabi"
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
-      { "command": "wabisabi.open", "title": "WabiSabi: Open Chat" },
-      { "command": "wabisabi.settings", "title": "WabiSabi: Settings" },
-      { "command": "wabisabi.switchAgent", "title": "WabiSabi: Switch Agent" },
-      { "command": "wabisabi.switchModel", "title": "WabiSabi: Switch Model" },
-      { "command": "wabisabi.switchStrategy", "title": "WabiSabi: Switch Strategy" },
-      { "command": "wabisabi.onboarding", "title": "WabiSabi: Run Onboarding" },
-      { "command": "wabisabi.account", "title": "WabiSabi: Account" },
-      { "command": "wabisabi.explain", "title": "WabiSabi: Explain Selection" },
-      { "command": "wabisabi.fix", "title": "WabiSabi: Fix Selection" },
-      { "command": "wabisabi.test", "title": "WabiSabi: Generate Test" },
-      { "command": "wabisabi.review", "title": "WabiSabi: Review Selection" }
+      {
+        "command": "wabisabi.open",
+        "title": "WabiSabi: Open Chat"
+      },
+      {
+        "command": "wabisabi.settings",
+        "title": "WabiSabi: Settings"
+      },
+      {
+        "command": "wabisabi.switchAgent",
+        "title": "WabiSabi: Switch Agent"
+      },
+      {
+        "command": "wabisabi.switchModel",
+        "title": "WabiSabi: Switch Model"
+      },
+      {
+        "command": "wabisabi.switchStrategy",
+        "title": "WabiSabi: Switch Strategy"
+      },
+      {
+        "command": "wabisabi.onboarding",
+        "title": "WabiSabi: Run Onboarding"
+      },
+      {
+        "command": "wabisabi.account",
+        "title": "WabiSabi: Account"
+      },
+      {
+        "command": "wabisabi.explain",
+        "title": "WabiSabi: Explain Selection"
+      },
+      {
+        "command": "wabisabi.fix",
+        "title": "WabiSabi: Fix Selection"
+      },
+      {
+        "command": "wabisabi.test",
+        "title": "WabiSabi: Generate Test"
+      },
+      {
+        "command": "wabisabi.review",
+        "title": "WabiSabi: Review Selection"
+      }
     ],
     "viewsContainers": {
       "activitybar": [
@@ -33,22 +79,56 @@
     },
     "views": {
       "wabisabi": [
-        { "type": "webview", "id": "wabisabi.chat", "name": "Chat" },
-        { "id": "wabisabi.agents", "name": "Agents" },
-        { "id": "wabisabi.tasks", "name": "Tasks" }
+        {
+          "type": "webview",
+          "id": "wabisabi.chat",
+          "name": "Chat"
+        },
+        {
+          "id": "wabisabi.agents",
+          "name": "Agents"
+        },
+        {
+          "id": "wabisabi.tasks",
+          "name": "Tasks"
+        }
       ]
     },
     "menus": {
       "editor/context": [
-        { "command": "wabisabi.explain", "group": "wabisabi@1", "when": "editorHasSelection" },
-        { "command": "wabisabi.fix", "group": "wabisabi@2", "when": "editorHasSelection" },
-        { "command": "wabisabi.test", "group": "wabisabi@3", "when": "editorHasSelection" },
-        { "command": "wabisabi.review", "group": "wabisabi@4", "when": "editorHasSelection" }
+        {
+          "command": "wabisabi.explain",
+          "group": "wabisabi@1",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "wabisabi.fix",
+          "group": "wabisabi@2",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "wabisabi.test",
+          "group": "wabisabi@3",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "wabisabi.review",
+          "group": "wabisabi@4",
+          "when": "editorHasSelection"
+        }
       ]
     },
     "keybindings": [
-      { "command": "wabisabi.open", "key": "ctrl+shift+w", "mac": "cmd+shift+w" },
-      { "command": "wabisabi.switchAgent", "key": "ctrl+shift+a", "mac": "cmd+shift+a" }
+      {
+        "command": "wabisabi.open",
+        "key": "ctrl+shift+w",
+        "mac": "cmd+shift+w"
+      },
+      {
+        "command": "wabisabi.switchAgent",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a"
+      }
     ],
     "configuration": {
       "title": "WabiSabi",
@@ -61,13 +141,25 @@
         "wabisabi.providerStrategy": {
           "type": "string",
           "default": "hybrid-local-first",
-          "enum": ["local", "cluster", "cloud", "cluster-cloud", "hybrid-local-first", "hybrid-cloud-first", "hybrid-full"],
+          "enum": [
+            "local",
+            "cluster",
+            "cloud",
+            "cluster-cloud",
+            "hybrid-local-first",
+            "hybrid-cloud-first",
+            "hybrid-full"
+          ],
           "description": "Provider strategy"
         },
         "wabisabi.defaultAgent": {
           "type": "string",
           "default": "build",
-          "enum": ["build", "plan", "search"],
+          "enum": [
+            "build",
+            "plan",
+            "search"
+          ],
           "description": "Default agent"
         },
         "wabisabi.ollamaUrl": {
@@ -92,7 +184,9 @@
     "@wabisabi/core": "file:../core"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/vscode": "^1.85.0",
+    "mocha": "^11.7.5",
     "typescript": "^5.3.0"
   }
 }

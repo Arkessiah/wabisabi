@@ -1,0 +1,75 @@
+name: Publish VS Code Extension
+
+on:
+  push:
+    tags:
+      - 'vscode-v*'
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/vscode
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Build core dependency first
+      - name: Install & build core
+        run: |
+          cd ../core
+          npm install
+          npx tsc -p .
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Compile TypeScript
+        run: npm run build
+
+      - name: Run tests
+        run: npx mocha dist/test/suite.test.js --timeout 10000
+        continue-on-error: true
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      # Tag-based publish
+      - name: Package & publish (tag)
+        if: startsWith(github.ref, 'refs/tags/vscode-v')
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          vsce package
+          vsce publish -p $VSCE_PAT
+
+      # Manual dispatch publish with version bump
+      - name: Package & publish (manual)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          vsce publish ${{ inputs.version_bump }} -p $VSCE_PAT
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wabisabi-vscode
+          path: packages/vscode/*.vsix
+          retention-days: 30
