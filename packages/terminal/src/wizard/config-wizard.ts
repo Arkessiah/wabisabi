@@ -36,7 +36,7 @@ export function showConfig(): void {
   console.log(chalk.bold("\n  Substratum"));
   console.log(`    Enabled: ${providers.substratum.enabled ? chalk.green("yes") : chalk.dim("no")}`);
   console.log(`    URL:     ${providers.substratum.url}`);
-  console.log(`    API Key: ${providers.substratum.apiKey ? chalk.dim("****" + providers.substratum.apiKey.slice(-4)) : chalk.dim("not set")}`);
+  console.log(`    API Key: ${providers.substratum.apiKey ? chalk.dim("set") : chalk.dim("not set")}`);
 
   // Ollama
   console.log(chalk.bold("\n  Ollama"));
