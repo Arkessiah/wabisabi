@@ -29,7 +29,7 @@ export interface SpinnerHandle {
 
 // ── Command Palette ──────────────────────────────────────────
 
-export type PaletteSection = "agents" | "models" | "tokens" | "providers" | "sessions" | "profiles";
+export type PaletteSection = "agents" | "models" | "tokens" | "providers" | "sessions" | "profiles" | "strategies" | "settings";
 
 export interface PaletteItem {
   id: string;

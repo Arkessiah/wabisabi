@@ -86,6 +86,13 @@ export class TuiTerminalIO implements TerminalIO {
           agentSwitcher.set(result.itemId as any);
         } else if (result.section === "strategies") {
           configManager.update("providerStrategy", result.itemId, "global");
+        } else if (result.section === "settings") {
+          // Temporarily leave raw mode so the wizard can use readline
+          this.engine.stop();
+          const { runSettings } = await import("../onboarding.js");
+          await runSettings();
+          this.engine.start();
+          this.engine.fullRender();
         }
       }
     });
@@ -243,6 +250,14 @@ export class TuiTerminalIO implements TerminalIO {
         });
       }
     }
+
+    // Settings section
+    items.push({
+      id: "open-settings",
+      label: "Settings / Onboarding Wizard",
+      description: "Re-run setup: account, providers, model",
+      section: "settings",
+    });
 
     // Token stats section
     const { prompt, completion, total } = opts.tokens;
