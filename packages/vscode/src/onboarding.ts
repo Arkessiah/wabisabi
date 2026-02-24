@@ -7,7 +7,7 @@
 
 import * as vscode from "vscode";
 import { existsSync } from "fs";
-import { ONBOARDING_MARKER, PROVIDER_STRATEGIES } from "@wabisabi/core";
+import { ONBOARDING_MARKER, PROVIDER_STRATEGIES, type ProviderStrategy } from "@wabisabi/core";
 import type { WabiSabiConfig } from "./config";
 
 export function checkFirstRun(context: vscode.ExtensionContext, config: WabiSabiConfig) {
@@ -43,7 +43,7 @@ export async function runOnboardingVSCode(config: WabiSabiConfig): Promise<void>
   }
 
   // Step 2: Provider strategy
-  const strategyItems = PROVIDER_STRATEGIES.map((s) => ({
+  const strategyItems = PROVIDER_STRATEGIES.map((s: ProviderStrategy) => ({
     label: s.label,
     description: s.desc,
     id: s.id,

@@ -69,6 +69,16 @@
           "default": "build",
           "enum": ["build", "plan", "search"],
           "description": "Default agent"
+        },
+        "wabisabi.ollamaUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Ollama API URL (default: http://localhost:11434, or from ~/.wabisabi/config.jsonc)"
+        },
+        "wabisabi.substratumUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Substratum API URL (default: https://api.substratum.dev, or from ~/.wabisabi/config.jsonc)"
         }
       }
     }
@@ -79,7 +89,7 @@
     "package": "vsce package"
   },
   "dependencies": {
-    "@wabisabi/core": "workspace:*"
+    "@wabisabi/core": "file:../core"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
