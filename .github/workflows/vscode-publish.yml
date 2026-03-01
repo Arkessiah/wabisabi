@@ -44,8 +44,7 @@ jobs:
         run: npm run build
 
       - name: Run tests
-        run: npx mocha dist/test/suite.test.js --timeout 10000
-        continue-on-error: true
+        run: node --test dist/test/suite.test.js
 
       - name: Install vsce
         run: npm install -g @vscode/vsce

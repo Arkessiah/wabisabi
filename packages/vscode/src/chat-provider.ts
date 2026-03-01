@@ -100,8 +100,28 @@ export class ChatProvider implements vscode.WebviewViewProvider {
       await service.sendMessage(text);
       this.postMessage({ type: "stream-end" });
     } catch (err: any) {
-      this.postMessage({ type: "response", text: `Error: ${err.message}` });
+      const msg = err.message || "Unknown error";
       this.postMessage({ type: "stream-end" });
+
+      // Show appropriate VS Code notification based on error type
+      if (msg.includes("Provider offline") || msg.includes("No LLM provider")) {
+        vscode.window.showErrorMessage(msg, "Open Settings").then((action) => {
+          if (action === "Open Settings") {
+            vscode.commands.executeCommand("workbench.action.openSettings", "wabisabi");
+          }
+        });
+      } else if (msg.includes("Authentication failed")) {
+        vscode.window.showErrorMessage(msg, "Run Onboarding").then((action) => {
+          if (action === "Run Onboarding") {
+            vscode.commands.executeCommand("wabisabi.onboarding");
+          }
+        });
+      } else if (!msg.includes("cancelled")) {
+        // Don't show notification for user-initiated cancellations
+        vscode.window.showWarningMessage(`WabiSabi: ${msg}`);
+      }
+
+      this.postMessage({ type: "response", text: `Error: ${msg}` });
     }
   }
 

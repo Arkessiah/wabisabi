@@ -184,9 +184,7 @@
     "@wabisabi/core": "file:../core"
   },
   "devDependencies": {
-    "@types/mocha": "^10.0.10",
     "@types/vscode": "^1.85.0",
-    "mocha": "^11.7.5",
     "typescript": "^5.3.0"
   }
 }

@@ -2,18 +2,18 @@
  * VS Code Extension Tests
  *
  * Unit tests for core extension components.
- * Run with: npx @vscode/test-electron --extensionDevelopmentPath=. --extensionTestsPath=./dist/test/suite.test.js
+ * Run with: node --test dist/test/suite.test.js
  *
- * These tests can also be run standalone without VS Code for pure logic tests.
+ * Uses Node.js built-in test runner (no external deps).
  */
 
-import * as assert from "assert";
+import { describe, it } from "node:test";
+import * as assert from "node:assert/strict";
 
 // ── LLM Client Tests ─────────────────────────────────────────
 
 describe("LLMClient", () => {
   it("should construct with required options", () => {
-    // Dynamic import to avoid VS Code dependency
     const { LLMClient } = require("../llm-client");
     const client = new LLMClient({
       baseUrl: "http://localhost:11434",
@@ -29,7 +29,6 @@ describe("LLMClient", () => {
       model: "llama3.2",
       bearerToken: "test-token",
     });
-    // Access private method via prototype trick
     const headers = (client as any).getHeaders();
     assert.strictEqual(headers["Authorization"], "Bearer test-token");
     assert.strictEqual(headers["Content-Type"], "application/json");
@@ -70,19 +69,15 @@ describe("LLMClient", () => {
 // ── Tool Executor Tests ──────────────────────────────────────
 
 describe("ToolExecutor", () => {
-  const os = require("os");
-  const path = require("path");
-  const fs = require("fs");
-
-  it("should reject paths outside workspace", async () => {
-    // We can't directly import because it requires vscode module
-    // Test the path validation logic directly
+  it("should reject paths outside workspace", () => {
+    const path = require("path");
     const workspaceRoot = "/tmp/test-workspace";
     const resolved = path.resolve(workspaceRoot, "../../etc/passwd");
     assert.ok(!resolved.startsWith(workspaceRoot), "Path should be outside workspace");
   });
 
   it("should resolve relative paths correctly", () => {
+    const path = require("path");
     const workspaceRoot = "/tmp/test-workspace";
     const resolved = path.resolve(workspaceRoot, "src/index.ts");
     assert.ok(resolved.startsWith(workspaceRoot));
@@ -90,7 +85,6 @@ describe("ToolExecutor", () => {
   });
 
   it("should get correct tool specs for each agent", () => {
-    // Verify tool count per agent without importing vscode
     const buildTools = ["read", "grep", "glob", "list", "bash", "edit", "write"];
     const planTools = ["read", "grep", "glob", "list"];
     assert.strictEqual(buildTools.length, 7);

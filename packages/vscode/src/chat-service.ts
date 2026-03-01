@@ -138,7 +138,14 @@ export class ChatService {
    * Send a user message, stream the response with tool calling.
    */
   async sendMessage(text: string): Promise<string> {
-    const client = await this.ensureClient();
+    let client: LLMClient;
+    try {
+      client = await this.ensureClient();
+    } catch (err: any) {
+      const msg = this.formatConnectionError(err);
+      this.callbacks.onError(msg);
+      throw new Error(msg);
+    }
 
     // Build system message if this is the first message
     if (this.conversationHistory.length === 0) {
@@ -156,7 +163,16 @@ export class ChatService {
 
     // Stream response
     this.abortController = new AbortController();
-    let result = await this.streamFromLLM(client, toolSpecs);
+    let result: StreamResult;
+    try {
+      result = await this.streamFromLLM(client, toolSpecs);
+    } catch (err: any) {
+      const msg = this.formatStreamError(err);
+      this.callbacks.onError(msg);
+      // Remove the user message so conversation stays consistent
+      this.conversationHistory.pop();
+      throw new Error(msg);
+    }
 
     // Tool-calling loop
     let iterations = 0;
@@ -175,10 +191,15 @@ export class ChatService {
         this.callbacks.onToolCall(call.function.name, "running");
         this.callbacks.onStatus(`Running ${call.function.name}...`);
 
-        const toolResult = await this.toolExecutor.execute(
-          call.function.name,
-          call.function.arguments,
-        );
+        let toolResult: { title: string; output: string };
+        try {
+          toolResult = await this.toolExecutor.execute(
+            call.function.name,
+            call.function.arguments,
+          );
+        } catch (toolErr: any) {
+          toolResult = { title: call.function.name, output: `Tool error: ${toolErr.message}` };
+        }
 
         // Truncate large outputs
         let output = toolResult.output;
@@ -197,7 +218,18 @@ export class ChatService {
 
       // Re-call LLM with tool results
       this.callbacks.onStatus("Analyzing results...");
-      result = await this.streamFromLLM(client, toolSpecs);
+      try {
+        result = await this.streamFromLLM(client, toolSpecs);
+      } catch (err: any) {
+        // Mid-loop stream failure: report error but keep tool results in history
+        const msg = this.formatStreamError(err);
+        this.callbacks.onError(msg);
+        return `(Streaming interrupted after ${iterations} tool iterations: ${msg})`;
+      }
+    }
+
+    if (iterations >= MAX_TOOL_ITERATIONS && result.tool_calls.length > 0) {
+      this.callbacks.onStatus("Tool iteration limit reached");
     }
 
     // Add final assistant response to history
@@ -249,10 +281,18 @@ export class ChatService {
   }
 
   /**
-   * Ensure LLM client is connected.
+   * Ensure LLM client is connected and healthy.
    */
   private async ensureClient(): Promise<LLMClient> {
-    if (this.client) return this.client;
+    if (this.client) {
+      // Verify existing client is still reachable
+      const healthy = await this.client.checkHealth(3000);
+      if (healthy) return this.client;
+
+      // Provider went offline, try to re-resolve
+      this.callbacks.onStatus("Provider disconnected, reconnecting...");
+      this.client = null;
+    }
 
     this.callbacks.onStatus("Connecting to provider...");
     const provider = await this.providerManager.resolve();
@@ -267,7 +307,51 @@ export class ChatService {
       maxTokens: this.config.maxTokens,
     });
 
+    // Verify connection
+    const healthy = await this.client.checkHealth(5000);
+    if (!healthy) {
+      this.client = null;
+      throw new Error(`Cannot reach ${provider.type} at ${provider.baseUrl}`);
+    }
+
     return this.client;
+  }
+
+  /** Format connection errors into user-friendly messages. */
+  private formatConnectionError(err: any): string {
+    const msg = err.message || String(err);
+    if (msg.includes("Cannot reach")) {
+      return `Provider offline: ${msg}. Check that Ollama is running or Substratum credentials are valid.`;
+    }
+    if (msg.includes("No provider available")) {
+      return "No LLM provider found. Start Ollama (`ollama serve`) or configure Substratum in settings.";
+    }
+    return `Connection failed: ${msg}`;
+  }
+
+  /** Format streaming errors into user-friendly messages. */
+  private formatStreamError(err: any): string {
+    const msg = err.message || String(err);
+    if (msg.includes("aborted") || msg.includes("AbortError")) {
+      return "Request cancelled.";
+    }
+    if (msg.includes("HTTP 401") || msg.includes("HTTP 403")) {
+      return "Authentication failed. Check your API key or bearer token.";
+    }
+    if (msg.includes("HTTP 429")) {
+      return "Rate limited. Wait a moment and try again.";
+    }
+    if (msg.includes("HTTP 5")) {
+      return `Server error: ${msg}. The provider may be overloaded.`;
+    }
+    if (msg.includes("timeout") || msg.includes("Timeout")) {
+      return "Request timed out. The model may be loading or overloaded.";
+    }
+    if (msg.includes("Connection failed") || msg.includes("ECONNREFUSED")) {
+      this.client = null; // Force reconnect
+      return "Connection lost. Provider may have gone offline.";
+    }
+    return `Stream error: ${msg}`;
   }
 
   /** Cancel current request. */
