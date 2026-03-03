@@ -61,8 +61,12 @@ export async function getUserProfile() {
 
 export async function login(email: string, password: string) {
   const response = await api.post("/auth/login", { email, password });
-  if (response.data.token) {
-    localStorage.setItem("token", response.data.token);
+  const token = response.data.accessToken || response.data.token;
+  if (token) {
+    localStorage.setItem("token", token);
+  }
+  if (response.data.refreshToken) {
+    localStorage.setItem("refreshToken", response.data.refreshToken);
   }
   return response.data;
 }
@@ -73,8 +77,12 @@ export async function register(data: {
   name: string;
 }) {
   const response = await api.post("/auth/register", data);
-  if (response.data.token) {
-    localStorage.setItem("token", response.data.token);
+  const token = response.data.accessToken || response.data.token;
+  if (token) {
+    localStorage.setItem("token", token);
+  }
+  if (response.data.refreshToken) {
+    localStorage.setItem("refreshToken", response.data.refreshToken);
   }
   return response.data;
 }
