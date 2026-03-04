@@ -2,62 +2,33 @@
 
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
-  MessageSquare,
-  Plus,
   Settings,
   LogOut,
-  Search,
   Menu,
-  X,
   ChevronRight,
   Clock,
   Zap,
-  Users,
   BarChart3,
   Cpu,
   Network,
-  Activity,
   Terminal,
   Database,
   Cpu as Microchip,
   Globe,
   HardDrive,
   Zap as Lightning,
+  CreditCard,
+  Download,
+  Key,
+  LayoutDashboard,
+  Receipt,
+  User,
+  Monitor,
+  Package,
 } from "lucide-react";
-import { Logo, FriendlyBot } from "@/components/ui/logo";
-
-const recentChats = [
-  {
-    id: "1",
-    title: "Building REST API",
-    model: "deepseek-coder",
-    time: "2 hours ago",
-    messages: 45,
-  },
-  {
-    id: "2",
-    title: "React Component Refactor",
-    model: "claude-3-5-sonnet",
-    time: "5 hours ago",
-    messages: 23,
-  },
-  {
-    id: "3",
-    title: "Database Schema Design",
-    model: "deepseek-coder",
-    time: "Yesterday",
-    messages: 67,
-  },
-  {
-    id: "4",
-    title: "Bug Fix: Authentication",
-    model: "gpt-4o",
-    time: "2 days ago",
-    messages: 12,
-  },
-];
+import { FriendlyBot } from "@/components/ui/logo";
 
 const models = [
   {
@@ -107,18 +78,18 @@ const stats = [
     change: "+12%",
   },
   {
-    label: "Active Chats",
-    value: "23",
-    icon: MessageSquare,
+    label: "Credits Left",
+    value: "$18.50",
+    icon: CreditCard,
     color: "#F97316",
-    change: "+5%",
+    change: "-$11.50",
   },
   {
-    label: "Models Used",
-    value: "8",
-    icon: Microchip,
+    label: "API Calls",
+    value: "1,247",
+    icon: Zap,
     color: "#64748b",
-    change: "+2",
+    change: "+34%",
   },
   {
     label: "Hours Saved",
@@ -137,6 +108,14 @@ const usageData = [
   { day: "Fri", value: 70 },
   { day: "Sat", value: 30 },
   { day: "Sun", value: 50 },
+];
+
+const sidebarNav = [
+  { icon: LayoutDashboard, label: "Overview", href: "/dashboard", active: true },
+  { icon: Receipt, label: "Billing", href: "/dashboard?tab=billing", active: false },
+  { icon: Key, label: "API Keys", href: "/dashboard?tab=keys", active: false },
+  { icon: Download, label: "Downloads", href: "/dashboard?tab=downloads", active: false },
+  { icon: User, label: "Account", href: "/dashboard?tab=account", active: false },
 ];
 
 function StatCard({
@@ -203,7 +182,7 @@ function TerminalWindow({
   );
 }
 
-function ChatContent() {
+function DashboardContent() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -221,7 +200,7 @@ function ChatContent() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
-      {/* Mobile Header - Terminal Style */}
+      {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-[#1e293b] border-b border-slate-700 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -242,7 +221,7 @@ function ChatContent() {
         </div>
       </div>
 
-      {/* Sidebar - Terminal Style */}
+      {/* Sidebar */}
       <aside
         className={`fixed left-0 top-0 bottom-0 z-40 bg-[#1e293b] border-r border-slate-700 transition-all duration-300 ${
           sidebarOpen ? "w-64" : "w-20"
@@ -251,56 +230,83 @@ function ChatContent() {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-4 border-b border-slate-700">
-            <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-3">
               <FriendlyBot size="md" />
               {sidebarOpen && (
                 <span className="font-bold text-white">Wabi-Sabi</span>
               )}
-            </div>
-          </div>
-
-          {/* New Chat Button */}
-          <div className="p-4">
-            <button
-              onClick={() => router.push("/chat")}
-              className={`w-full py-2.5 rounded-lg bg-[#F97316] text-white font-medium flex items-center justify-center gap-2 hover:bg-[#ea580c] transition-all ${
-                !sidebarOpen ? "px-0" : ""
-              }`}
-            >
-              <Plus className="w-4 h-4" />
-              {sidebarOpen && <span className="text-sm">New Chat</span>}
-            </button>
+            </Link>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          <nav className="flex-1 p-4 space-y-1">
             {sidebarOpen && (
               <p className="text-xs font-medium text-slate-500 uppercase mb-3 font-mono">
-                ● Recent Sessions
+                Dashboard
               </p>
             )}
-            {recentChats.map((chat) => (
+            {sidebarNav.map((item) => (
               <Link
-                key={chat.id}
-                href={`/chat/${chat.id}`}
-                className={`flex items-center gap-3 p-2.5 rounded-lg hover:bg-slate-700 transition-colors group ${
+                key={item.label}
+                href={item.href}
+                className={`flex items-center gap-3 p-2.5 rounded-lg transition-colors group ${
                   !sidebarOpen ? "justify-center" : ""
+                } ${
+                  item.active
+                    ? "bg-slate-700 text-white"
+                    : "hover:bg-slate-700 text-slate-400"
                 }`}
               >
-                <MessageSquare className="w-4 h-4 text-slate-400 group-hover:text-[#F97316]" />
+                <item.icon className={`w-4 h-4 ${item.active ? "text-[#F97316]" : "text-slate-400 group-hover:text-[#F97316]"}`} />
                 {sidebarOpen && (
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-300 truncate group-hover:text-white">
-                      {chat.title}
-                    </p>
-                    <p className="text-xs text-slate-500">{chat.time}</p>
-                  </div>
+                  <span className={`text-sm ${item.active ? "text-white font-medium" : "text-slate-300 group-hover:text-white"}`}>
+                    {item.label}
+                  </span>
                 )}
               </Link>
             ))}
+
+            {sidebarOpen && (
+              <>
+                <div className="my-4 border-t border-slate-700" />
+                <p className="text-xs font-medium text-slate-500 uppercase mb-3 font-mono">
+                  Quick Links
+                </p>
+              </>
+            )}
+            <a
+              href="https://github.com/Arkessiah/wabisabi/releases"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex items-center gap-3 p-2.5 rounded-lg hover:bg-slate-700 transition-colors group ${
+                !sidebarOpen ? "justify-center" : ""
+              }`}
+            >
+              <Terminal className="w-4 h-4 text-slate-400 group-hover:text-[#F97316]" />
+              {sidebarOpen && (
+                <span className="text-sm text-slate-300 group-hover:text-white">
+                  Download CLI
+                </span>
+              )}
+            </a>
+            <a
+              href="https://marketplace.visualstudio.com/items?itemName=wabisabi.wabisabi-ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex items-center gap-3 p-2.5 rounded-lg hover:bg-slate-700 transition-colors group ${
+                !sidebarOpen ? "justify-center" : ""
+              }`}
+            >
+              <Monitor className="w-4 h-4 text-slate-400 group-hover:text-[#8B5CF6]" />
+              {sidebarOpen && (
+                <span className="text-sm text-slate-300 group-hover:text-white">
+                  VS Code Extension
+                </span>
+              )}
+            </a>
           </nav>
 
-          {/* User Section - Terminal Style */}
+          {/* User Section */}
           <div className="p-4 border-t border-slate-700">
             <div
               className={`flex items-center gap-3 ${
@@ -313,7 +319,7 @@ function ChatContent() {
               {sidebarOpen && (
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-white truncate">John Doe</p>
-                  <p className="text-xs text-slate-500">● Pro Plan</p>
+                  <p className="text-xs text-slate-500">Pro Plan</p>
                 </div>
               )}
             </div>
@@ -321,11 +327,11 @@ function ChatContent() {
               <div className="flex gap-2 mt-4">
                 <button className="flex-1 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors flex items-center justify-center gap-2">
                   <Settings className="w-4 h-4 text-slate-400" />
-                  <span className="text-xs text-slate-300">Config</span>
+                  <span className="text-xs text-slate-300">Settings</span>
                 </button>
                 <button className="flex-1 py-2 rounded-lg bg-slate-700 hover:bg-red-900/50 transition-colors flex items-center justify-center gap-2">
                   <LogOut className="w-4 h-4 text-slate-400" />
-                  <span className="text-xs text-slate-300">Exit</span>
+                  <span className="text-xs text-slate-300">Sign Out</span>
                 </button>
               </div>
             )}
@@ -360,13 +366,13 @@ function ChatContent() {
         }`}
       >
         <div className="p-6 lg:p-8">
-          {/* Welcome Header - Terminal Style */}
+          {/* Welcome Header */}
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xs text-slate-400 font-mono">
                 {currentTime}
               </span>
-              <span className="text-xs text-slate-500 font-mono">●</span>
+              <span className="text-xs text-slate-500 font-mono">&bull;</span>
               <span className="text-xs text-slate-400 font-mono">
                 wabi-sabi v2.1.0
               </span>
@@ -375,7 +381,7 @@ function ChatContent() {
               Welcome back, <span className="text-[#F97316]">John</span>
             </h1>
             <p className="text-slate-500 mt-1 font-mono text-sm">
-              $ system --status: ready
+              Pro Plan &bull; 18.50 credits remaining
             </p>
           </div>
 
@@ -387,8 +393,8 @@ function ChatContent() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {/* Available Models - Terminal Style */}
-            <TerminalWindow title="● Available Models">
+            {/* Available Models */}
+            <TerminalWindow title="Available Models">
               <div className="space-y-3">
                 {models.slice(0, 4).map((model) => (
                   <div
@@ -416,7 +422,7 @@ function ChatContent() {
                           {model.name}
                         </p>
                         <p className="text-xs text-slate-500">
-                          {model.provider} ● {model.context}
+                          {model.provider} &bull; {model.context}
                         </p>
                       </div>
                     </div>
@@ -443,15 +449,10 @@ function ChatContent() {
                   </div>
                 ))}
               </div>
-              <div className="mt-4 pt-4 border-t border-slate-700 flex justify-center">
-                <button className="text-xs text-[#F97316] hover:text-[#ea580c] font-mono">
-                  → view_all_models
-                </button>
-              </div>
             </TerminalWindow>
 
-            {/* Weekly Usage - Terminal Style */}
-            <TerminalWindow title="● Weekly Token Usage">
+            {/* Weekly Usage */}
+            <TerminalWindow title="Weekly Token Usage">
               <div className="h-40 flex items-end justify-between gap-2">
                 {usageData.map((item, index) => (
                   <div
@@ -471,7 +472,7 @@ function ChatContent() {
               <div className="mt-4 pt-4 border-t border-slate-700">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500 font-mono">
-                    $ total --week
+                    Total this week
                   </span>
                   <span className="font-semibold text-white font-mono">
                     425,000 tokens
@@ -481,44 +482,48 @@ function ChatContent() {
             </TerminalWindow>
           </div>
 
-          {/* Quick Actions - Terminal Style */}
+          {/* Quick Actions */}
           <div className="mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-xs text-slate-400 font-mono">$</span>
-              <h2 className="text-lg font-semibold text-slate-800">
-                Quick Actions
-              </h2>
-            </div>
+            <h2 className="text-lg font-semibold text-slate-800 mb-4">
+              Quick Actions
+            </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 {
-                  icon: Plus,
-                  label: "New Project",
-                  action: "init",
+                  icon: Download,
+                  label: "Download CLI",
+                  desc: "Install terminal agent",
                   color: "#F97316",
+                  href: "https://github.com/Arkessiah/wabisabi/releases",
                 },
                 {
-                  icon: Network,
-                  label: "Connect Node",
-                  action: "connect",
+                  icon: Monitor,
+                  label: "VS Code Extension",
+                  desc: "Install plugin",
                   color: "#8B5CF6",
+                  href: "https://marketplace.visualstudio.com/items?itemName=wabisabi.wabisabi-ai",
                 },
                 {
-                  icon: Database,
-                  label: "Deploy DB",
-                  action: "deploy",
-                  color: "#64748b",
-                },
-                {
-                  icon: Terminal,
-                  label: "Shell",
-                  action: "shell",
+                  icon: CreditCard,
+                  label: "Buy Credits",
+                  desc: "Add funds to account",
                   color: "#22c55e",
+                  href: "/dashboard?tab=billing",
+                },
+                {
+                  icon: Key,
+                  label: "API Keys",
+                  desc: "Manage access tokens",
+                  color: "#64748b",
+                  href: "/dashboard?tab=keys",
                 },
               ].map((action, index) => (
-                <button
+                <a
                   key={index}
-                  className="p-4 rounded-xl bg-white border border-slate-200 hover:shadow-lg hover:border-[#F97316]/30 transition-all text-left group"
+                  href={action.href}
+                  target={action.href.startsWith("http") ? "_blank" : undefined}
+                  rel={action.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                  className="p-4 rounded-xl bg-white border border-slate-200 hover:shadow-lg hover:border-[#F97316]/30 transition-all text-left group block"
                 >
                   <div
                     className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center mb-3 border border-slate-200 group-hover:border-[#F97316]/50 transition-colors"
@@ -532,16 +537,16 @@ function ChatContent() {
                   <p className="text-sm font-medium text-slate-800 group-hover:text-[#F97316] transition-colors">
                     {action.label}
                   </p>
-                  <p className="text-xs text-slate-400 font-mono mt-1">
-                    $ {action.action}
+                  <p className="text-xs text-slate-400 mt-1">
+                    {action.desc}
                   </p>
-                </button>
+                </a>
               ))}
             </div>
           </div>
 
-          {/* System Status - Terminal Style */}
-          <TerminalWindow title="● System Status">
+          {/* System Status */}
+          <TerminalWindow title="System Status">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 {
@@ -614,7 +619,7 @@ export default function DashboardPage() {
         </div>
       }
     >
-      <ChatContent />
+      <DashboardContent />
     </Suspense>
   );
 }
