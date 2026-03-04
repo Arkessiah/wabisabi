@@ -162,14 +162,35 @@ const slides = [
   },
 ];
 
+type Platform = "macOS" | "Linux" | "Windows";
+
+const platformCommands: Record<Platform, { primary: string; secondary: string; secondaryLabel: string }> = {
+  macOS: {
+    primary: "curl -fsSL https://wabisabi.dev/install.sh | bash",
+    secondary: "brew install wabisabi",
+    secondaryLabel: "Option 2: Homebrew",
+  },
+  Linux: {
+    primary: "curl -fsSL https://wabisabi.dev/install.sh | bash",
+    secondary: "npm install -g @wabisabi/cli",
+    secondaryLabel: "Option 2: npm / bun",
+  },
+  Windows: {
+    primary: "npm install -g @wabisabi/cli",
+    secondary: "iwr https://wabisabi.dev/install.ps1 -useb | iex",
+    secondaryLabel: "Option 2: PowerShell script",
+  },
+};
+
 export default function HomePage() {
   const [hoveredFeature, setHoveredFeature] = useState<number | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [platform, setPlatform] = useState<Platform>("macOS");
 
-  const copyInstallCmd = () => {
-    navigator.clipboard.writeText("curl -fsSL https://wabisabi.dev/install.sh | bash");
+  const copyCmd = (cmd: string) => {
+    navigator.clipboard.writeText(cmd);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -450,21 +471,39 @@ export default function HomePage() {
               <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-700">
                 <Terminal className="w-5 h-5 text-[#F97316]" />
                 <h3 className="text-lg font-semibold text-white">Terminal CLI</h3>
-                <span className="ml-auto text-xs text-slate-500 font-mono">macOS / Linux</span>
               </div>
               <div className="p-5">
                 <p className="text-sm text-slate-400 mb-4">
                   Full-featured AI coding agent in your terminal. Autonomous agents, 11 tools, memory system.
                 </p>
 
-                <div className="mb-4">
-                  <p className="text-xs text-slate-500 font-mono mb-2">Option 1: Quick install</p>
-                  <div className="flex items-center gap-2 bg-[#0f172a] rounded-lg px-4 py-3 border border-slate-700 group">
-                    <span className="text-[#F97316] font-mono text-sm">$</span>
-                    <code className="text-slate-300 text-sm font-mono flex-1">curl -fsSL https://wabisabi.dev/install.sh | bash</code>
+                {/* Platform tabs */}
+                <div className="flex gap-1 mb-4 bg-[#0f172a] rounded-lg p-1 border border-slate-700">
+                  {(["macOS", "Linux", "Windows"] as Platform[]).map((p) => (
                     <button
-                      onClick={copyInstallCmd}
-                      className="text-slate-500 hover:text-[#F97316] transition-colors"
+                      key={p}
+                      onClick={() => setPlatform(p)}
+                      className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
+                        platform === p
+                          ? "bg-[#F97316] text-white"
+                          : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mb-4">
+                  <p className="text-xs text-slate-500 font-mono mb-2">
+                    {platform === "Windows" ? "Option 1: npm (requires Node.js)" : "Option 1: Quick install"}
+                  </p>
+                  <div className="flex items-center gap-2 bg-[#0f172a] rounded-lg px-4 py-3 border border-slate-700 group">
+                    <span className="text-[#F97316] font-mono text-sm">{platform === "Windows" ? ">" : "$"}</span>
+                    <code className="text-slate-300 text-sm font-mono flex-1 break-all">{platformCommands[platform].primary}</code>
+                    <button
+                      onClick={() => copyCmd(platformCommands[platform].primary)}
+                      className="text-slate-500 hover:text-[#F97316] transition-colors flex-shrink-0"
                       title="Copy"
                     >
                       {copied ? <Check className="w-4 h-4 text-[#22c55e]" /> : <Copy className="w-4 h-4" />}
@@ -473,31 +512,28 @@ export default function HomePage() {
                 </div>
 
                 <div className="mb-4">
-                  <p className="text-xs text-slate-500 font-mono mb-2">Option 2: npm / bun</p>
-                  <div className="bg-[#0f172a] rounded-lg px-4 py-3 border border-slate-700">
-                    <code className="text-slate-300 text-sm font-mono">npm install -g @wabisabi/cli</code>
+                  <p className="text-xs text-slate-500 font-mono mb-2">{platformCommands[platform].secondaryLabel}</p>
+                  <div className="flex items-center gap-2 bg-[#0f172a] rounded-lg px-4 py-3 border border-slate-700">
+                    <span className="text-[#F97316] font-mono text-sm">{platform === "Windows" ? ">" : "$"}</span>
+                    <code className="text-slate-300 text-sm font-mono flex-1 break-all">{platformCommands[platform].secondary}</code>
+                    <button
+                      onClick={() => copyCmd(platformCommands[platform].secondary)}
+                      className="text-slate-500 hover:text-[#F97316] transition-colors flex-shrink-0"
+                      title="Copy"
+                    >
+                      {copied ? <Check className="w-4 h-4 text-[#22c55e]" /> : <Copy className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 mt-5">
-                  <a
-                    href="https://github.com/Arkessiah/wabisabi/releases"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 py-3 rounded-lg bg-[#F97316] text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#ea580c] transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download Latest
-                  </a>
-                  <a
-                    href="https://github.com/Arkessiah/wabisabi"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="py-3 px-4 rounded-lg bg-slate-800 text-slate-300 text-sm font-medium hover:bg-slate-700 transition-colors border border-slate-600"
-                  >
-                    GitHub
-                  </a>
-                </div>
+                <a
+                  href="https://github.com/Arkessiah/wabisabi"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 rounded-lg bg-slate-800 text-slate-300 text-sm font-medium flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors border border-slate-600"
+                >
+                  View on GitHub
+                </a>
               </div>
             </div>
 
