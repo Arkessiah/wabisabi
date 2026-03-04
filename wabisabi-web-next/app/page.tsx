@@ -23,6 +23,10 @@ import {
   Server,
   Network,
   Cuboid,
+  Download,
+  Monitor,
+  Copy,
+  Check,
 } from "lucide-react";
 import { FriendlyBot } from "@/components/ui/logo";
 
@@ -162,6 +166,13 @@ export default function HomePage() {
   const [hoveredFeature, setHoveredFeature] = useState<number | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copyInstallCmd = () => {
+    navigator.clipboard.writeText("curl -fsSL https://wabisabi.dev/install.sh | bash");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const nextSlide = () => {
     setCurrentSlide((prev) => (prev + 1) % slides.length);
@@ -186,6 +197,12 @@ export default function HomePage() {
 
             <div className="hidden md:flex items-center gap-8">
               <Link
+                href="#install"
+                className="text-sm text-slate-600 hover:text-[#F97316] transition-colors font-medium"
+              >
+                Install
+              </Link>
+              <Link
                 href="#features"
                 className="text-sm text-slate-600 hover:text-[#F97316] transition-colors font-medium"
               >
@@ -203,12 +220,6 @@ export default function HomePage() {
               >
                 Pricing
               </Link>
-              <Link
-                href="#docs"
-                className="text-sm text-slate-600 hover:text-[#F97316] transition-colors font-medium"
-              >
-                Documentation
-              </Link>
             </div>
 
             <div className="hidden md:flex items-center gap-4">
@@ -220,9 +231,15 @@ export default function HomePage() {
               </Link>
               <Link
                 href="/dashboard"
+                className="text-sm text-slate-600 hover:text-[#1e293b] transition-colors font-medium"
+              >
+                Dashboard
+              </Link>
+              <Link
+                href="#install"
                 className="px-5 py-2.5 rounded-lg bg-[#F97316] text-white text-sm font-medium hover:bg-[#ea580c] transition-colors shadow-lg shadow-[#F97316]/30"
               >
-                Get Started
+                Download
               </Link>
             </div>
 
@@ -239,6 +256,12 @@ export default function HomePage() {
           <div className="md:hidden border-t border-slate-200 bg-white">
             <div className="px-6 py-4 flex flex-col gap-4">
               <Link
+                href="#install"
+                className="text-sm text-slate-600 font-medium"
+              >
+                Install
+              </Link>
+              <Link
                 href="#features"
                 className="text-sm text-slate-600 font-medium"
               >
@@ -256,14 +279,11 @@ export default function HomePage() {
               >
                 Pricing
               </Link>
-              <Link href="#docs" className="text-sm text-slate-600 font-medium">
-                Documentation
-              </Link>
               <Link
-                href="/dashboard"
+                href="#install"
                 className="px-5 py-2.5 rounded-lg bg-[#F97316] text-white text-sm font-medium text-center"
               >
-                Get Started
+                Download
               </Link>
             </div>
           </div>
@@ -283,38 +303,41 @@ export default function HomePage() {
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow-md border border-slate-200 mb-8">
                 <span className="w-2 h-2 rounded-full bg-[#F97316] animate-pulse" />
                 <span className="text-sm text-slate-600 font-medium">
-                  Now with Claude 3.5 support
+                  Terminal CLI + VS Code Extension
                 </span>
               </div>
 
               <h1 className="text-5xl md:text-6xl font-bold mb-6">
-                <span className="text-slate-800">AI Development</span>
+                <span className="text-slate-800">AI Coding Agent</span>
                 <br />
                 <span className="bg-gradient-to-r from-white via-[#F97316] to-[#F97316] bg-clip-text text-transparent">
-                  Reimagined
+                  for your IDE
                 </span>
               </h1>
 
               <p className="text-xl text-slate-500 max-w-xl mx-auto lg:mx-0 mb-10">
-                The next-generation AI platform that combines powerful models
-                with a collaborative economy. Build faster, smarter, and
-                together.
+                Install WabiSabi in your terminal or VS Code. Autonomous agents
+                that read, write, and run code with local or cloud AI models.
               </p>
 
-              <div className="flex items-center justify-center lg:justify-start gap-4">
+              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
                 <Link
-                  href="/dashboard"
+                  href="#install"
                   className="group px-8 py-4 rounded-xl bg-[#F97316] text-white font-medium flex items-center gap-2 hover:bg-[#ea580c] transition-all shadow-lg shadow-[#F97316]/30"
                 >
-                  Start Building Free
+                  <Download className="w-5 h-5" />
+                  Install CLI
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
-                <Link
-                  href="#docs"
+                <a
+                  href="https://marketplace.visualstudio.com/items?itemName=wabisabi.wabisabi-ai"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="px-8 py-4 rounded-xl bg-white text-slate-700 font-medium flex items-center gap-2 hover:bg-slate-50 transition-all shadow-md border border-slate-200"
                 >
-                  View Documentation
-                </Link>
+                  <Monitor className="w-5 h-5 text-[#8B5CF6]" />
+                  VS Code Extension
+                </a>
               </div>
             </div>
 
@@ -403,99 +426,145 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Code Generation Terminal Demo */}
-      <section className="py-20 bg-[#0f172a]">
+      {/* Install Section */}
+      <section id="install" className="py-20 bg-[#0f172a]">
         <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center mb-8">
+          <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#F97316]/20 border border-[#F97316]/30 mb-4">
               <span className="w-2 h-2 rounded-full bg-[#F97316] animate-pulse" />
               <span className="text-sm text-[#F97316] font-medium">
-                AI Code Generation
+                Get Started in 30 seconds
               </span>
             </div>
             <h2 className="text-3xl font-bold text-white mb-2">
-              Code smarter, not harder
+              Install WabiSabi
             </h2>
             <p className="text-slate-400">
-              Watch the AI assistant generate code directly in your terminal
+              Choose your preferred way to use WabiSabi
             </p>
           </div>
 
-          <div className="rounded-xl bg-[#1e293b] shadow-2xl shadow-[#F97316]/10 overflow-hidden border border-slate-700">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700 bg-[#0f172a]">
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-[#ef4444]" />
-                <div className="w-3 h-3 rounded-full bg-[#f59e0b]" />
-                <div className="w-3 h-3 rounded-full bg-[#22c55e]" />
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* CLI Install */}
+            <div className="rounded-xl bg-[#1e293b] border border-slate-700 overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-700">
+                <Terminal className="w-5 h-5 text-[#F97316]" />
+                <h3 className="text-lg font-semibold text-white">Terminal CLI</h3>
+                <span className="ml-auto text-xs text-slate-500 font-mono">macOS / Linux</span>
               </div>
-              <span className="text-sm text-slate-400 ml-4">
-                wabi-sabi — ai-assistant
-              </span>
+              <div className="p-5">
+                <p className="text-sm text-slate-400 mb-4">
+                  Full-featured AI coding agent in your terminal. Autonomous agents, 11 tools, memory system.
+                </p>
+
+                <div className="mb-4">
+                  <p className="text-xs text-slate-500 font-mono mb-2">Option 1: Quick install</p>
+                  <div className="flex items-center gap-2 bg-[#0f172a] rounded-lg px-4 py-3 border border-slate-700 group">
+                    <span className="text-[#F97316] font-mono text-sm">$</span>
+                    <code className="text-slate-300 text-sm font-mono flex-1">curl -fsSL https://wabisabi.dev/install.sh | bash</code>
+                    <button
+                      onClick={copyInstallCmd}
+                      className="text-slate-500 hover:text-[#F97316] transition-colors"
+                      title="Copy"
+                    >
+                      {copied ? <Check className="w-4 h-4 text-[#22c55e]" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <p className="text-xs text-slate-500 font-mono mb-2">Option 2: npm / bun</p>
+                  <div className="bg-[#0f172a] rounded-lg px-4 py-3 border border-slate-700">
+                    <code className="text-slate-300 text-sm font-mono">npm install -g @wabisabi/cli</code>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 mt-5">
+                  <a
+                    href="https://github.com/Arkessiah/wabisabi/releases"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-3 rounded-lg bg-[#F97316] text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#ea580c] transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download Latest
+                  </a>
+                  <a
+                    href="https://github.com/Arkessiah/wabisabi"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-3 px-4 rounded-lg bg-slate-800 text-slate-300 text-sm font-medium hover:bg-slate-700 transition-colors border border-slate-600"
+                  >
+                    GitHub
+                  </a>
+                </div>
+              </div>
             </div>
-            <div className="p-6 font-mono text-sm text-left">
-              <div className="mb-4">
-                <span className="text-[#F97316]">❯</span>
-                <span className="text-slate-300 ml-2">
-                  Create a REST API with Express and TypeScript
-                </span>
+
+            {/* VS Code Extension */}
+            <div className="rounded-xl bg-[#1e293b] border border-slate-700 overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-700">
+                <Monitor className="w-5 h-5 text-[#8B5CF6]" />
+                <h3 className="text-lg font-semibold text-white">VS Code Extension</h3>
+                <span className="ml-auto text-xs text-slate-500 font-mono">all platforms</span>
               </div>
-              <div className="text-[#8B5CF6] mb-2">◇ Analyzing request...</div>
-              <div className="text-[#8B5CF6] mb-2">◇ Planning structure...</div>
-              <div className="text-[#8B5CF6] mb-4">◇ Generating code...</div>
-              <div className="text-slate-400 mb-4">
-                <pre className="text-xs">{`
-// server.ts - Express API with TypeScript
-import express, { Request, Response } from 'express';
-import cors from 'cors';
+              <div className="p-5">
+                <p className="text-sm text-slate-400 mb-4">
+                  AI chat sidebar, inline completions, task tracking, and markdown rendering inside VS Code.
+                </p>
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+                <div className="mb-4">
+                  <p className="text-xs text-slate-500 font-mono mb-2">From VS Code</p>
+                  <div className="bg-[#0f172a] rounded-lg px-4 py-3 border border-slate-700">
+                    <code className="text-slate-300 text-sm font-mono">ext install wabisabi.wabisabi-ai</code>
+                  </div>
+                </div>
 
-app.use(cors());
-app.use(express.json());
+                <div className="mb-4">
+                  <p className="text-xs text-slate-500 font-mono mb-2">Or search in Extensions panel</p>
+                  <div className="bg-[#0f172a] rounded-lg px-4 py-3 border border-slate-700 flex items-center gap-3">
+                    <span className="text-slate-500 text-sm">Search:</span>
+                    <code className="text-[#8B5CF6] text-sm font-mono">WabiSabi AI</code>
+                  </div>
+                </div>
 
-// Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+                <div className="bg-[#0f172a] rounded-lg p-4 border border-slate-700 mb-5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#F97316] to-[#8B5CF6] flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
+                      W
+                    </div>
+                    <div>
+                      <p className="text-white text-sm font-medium">WabiSabi AI</p>
+                      <p className="text-slate-500 text-xs">AI coding agent for VS Code</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-xs text-[#22c55e]">v0.1.0</span>
+                        <span className="text-xs text-slate-600">|</span>
+                        <span className="text-xs text-slate-500">wabisabi</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-// GET /users - List all users
-app.get('/api/users', async (req: Request, res: Response) => {
-  const users = await db.users.findMany();
-  res.json(users);
-});
-
-// POST /users - Create user
-app.post('/api/users', async (req: Request, res: Response) => {
-  const user = await db.users.create({ data: req.body });
-  res.status(201).json(user);
-});
-
-app.listen(PORT, () => {
-  console.log(\`Server running on http://localhost:\${PORT}\`);
-});`}</pre>
-              </div>
-              <div className="text-[#22c55e] mb-2">
-                ✓ Generated 45 lines of code
-              </div>
-              <div className="text-[#22c55e] mb-4">
-                ✓ Added type safety with TypeScript
-              </div>
-              <div className="flex gap-2">
-                <span className="text-[#F97316]">❯</span>
-                <span className="animate-pulse text-slate-400">_</span>
+                <a
+                  href="https://marketplace.visualstudio.com/items?itemName=wabisabi.wabisabi-ai"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 rounded-lg bg-[#8B5CF6] text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#7c3aed] transition-colors"
+                >
+                  <Monitor className="w-4 h-4" />
+                  Open in VS Code Marketplace
+                </a>
               </div>
             </div>
           </div>
 
+          {/* Requirements note */}
           <div className="mt-6 text-center">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#F97316] text-white font-medium hover:bg-[#ea580c] transition-colors shadow-lg shadow-[#F97316]/30"
-            >
-              Try it yourself
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            <p className="text-xs text-slate-500">
+              CLI requires <span className="text-slate-400">Bun</span> or <span className="text-slate-400">Node.js 18+</span>.
+              VS Code extension requires <span className="text-slate-400">VS Code 1.85+</span>.
+              Both need <span className="text-slate-400">Ollama</span> (local) or a <span className="text-slate-400">Substratum</span> account (cloud).
+            </p>
           </div>
         </div>
       </section>
@@ -843,7 +912,7 @@ app.listen(PORT, () => {
                   ))}
                 </ul>
                 <Link
-                  href="/dashboard"
+                  href="#install"
                   className={`w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all ${
                     plan.popular
                       ? "bg-[#8B5CF6] text-white hover:opacity-90 shadow-lg"
@@ -869,19 +938,29 @@ app.listen(PORT, () => {
                 <FriendlyBot size="lg" />
               </div>
               <h2 className="text-4xl font-bold text-slate-800 mb-4">
-                Ready to transform your development?
+                Ready to code with AI?
               </h2>
               <p className="text-slate-500 mb-8 max-w-xl mx-auto">
-                Join thousands of developers already building with Wabi-Sabi.
-                Start for free, upgrade when you need more.
+                Install WabiSabi in under 30 seconds. Works with Ollama (free, local)
+                or Substratum (cloud). No credit card required.
               </p>
-              <div className="flex items-center justify-center gap-4">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
-                  href="/dashboard"
-                  className="px-8 py-4 rounded-xl bg-[#F97316] text-white font-medium hover:bg-[#ea580c] transition-colors shadow-lg shadow-[#F97316]/30"
+                  href="#install"
+                  className="px-8 py-4 rounded-xl bg-[#F97316] text-white font-medium hover:bg-[#ea580c] transition-colors shadow-lg shadow-[#F97316]/30 flex items-center gap-2"
                 >
-                  Start Building Free
+                  <Download className="w-5 h-5" />
+                  Install CLI
                 </Link>
+                <a
+                  href="https://marketplace.visualstudio.com/items?itemName=wabisabi.wabisabi-ai"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-8 py-4 rounded-xl bg-[#8B5CF6] text-white font-medium hover:bg-[#7c3aed] transition-colors shadow-lg shadow-[#8B5CF6]/30 flex items-center gap-2"
+                >
+                  <Monitor className="w-5 h-5" />
+                  VS Code Extension
+                </a>
                 <Link
                   href="/login"
                   className="px-8 py-4 rounded-xl bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors shadow-md border border-slate-200"
@@ -906,16 +985,16 @@ app.listen(PORT, () => {
             </div>
             <div className="flex items-center gap-8">
               <Link
+                href="#install"
+                className="text-sm text-slate-600 hover:text-[#F97316] transition-colors font-medium"
+              >
+                Install
+              </Link>
+              <Link
                 href="#features"
                 className="text-sm text-slate-600 hover:text-[#F97316] transition-colors font-medium"
               >
                 Features
-              </Link>
-              <Link
-                href="#economy"
-                className="text-sm text-slate-600 hover:text-[#F97316] transition-colors font-medium"
-              >
-                Economy
               </Link>
               <Link
                 href="#pricing"
@@ -924,17 +1003,19 @@ app.listen(PORT, () => {
                 Pricing
               </Link>
               <Link
-                href="#docs"
+                href="/dashboard"
                 className="text-sm text-slate-600 hover:text-[#F97316] transition-colors font-medium"
               >
-                Docs
+                Dashboard
               </Link>
-              <Link
-                href="#"
+              <a
+                href="https://github.com/Arkessiah/wabisabi"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-sm text-slate-600 hover:text-[#F97316] transition-colors font-medium"
               >
                 GitHub
-              </Link>
+              </a>
             </div>
             <p className="text-sm text-slate-500">
               © 2026 Wabi-Sabi. Built with simplicity in mind.
