@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { login, register } from "@/lib/api";
-import { Logo } from "@/components/ui/logo";
+import { FriendlyBot } from "@/components/ui/logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -45,9 +45,9 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <Link href="/" className="flex items-center gap-3 mb-8">
-            <Logo variant="icon" size="lg" />
-            <span className="text-2xl font-bold text-[#1a1a2e]">
-              2BrainDevCore
+            <FriendlyBot size="md" />
+            <span className="text-2xl font-bold text-slate-800">
+              Wabi-Sabi
             </span>
           </Link>
 
@@ -76,7 +76,7 @@ export default function LoginPage() {
                 </label>
                 <input
                   type="text"
-                  className="w-full px-4 py-3 bg-white border border-[#e5e7eb] rounded-xl text-[#1a1a2e] placeholder-[#9ca3af] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/20 transition-all duration-300"
+                  className="w-full px-4 py-3 bg-white border border-[#e5e7eb] rounded-xl text-[#1a1a2e] placeholder-[#9ca3af] focus:outline-none focus:border-[#F97316] focus:ring-2 focus:ring-[#F97316]/20 transition-all duration-300"
                   placeholder="John Doe"
                   value={formData.name}
                   onChange={(e) =>
@@ -93,7 +93,7 @@ export default function LoginPage() {
               </label>
               <input
                 type="email"
-                className="w-full px-4 py-3 bg-white border border-[#e5e7eb] rounded-xl text-[#1a1a2e] placeholder-[#9ca3af] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/20 transition-all duration-300"
+                className="w-full px-4 py-3 bg-white border border-[#e5e7eb] rounded-xl text-[#1a1a2e] placeholder-[#9ca3af] focus:outline-none focus:border-[#F97316] focus:ring-2 focus:ring-[#F97316]/20 transition-all duration-300"
                 placeholder="you@example.com"
                 value={formData.email}
                 onChange={(e) =>
@@ -109,7 +109,7 @@ export default function LoginPage() {
               </label>
               <input
                 type="password"
-                className="w-full px-4 py-3 bg-white border border-[#e5e7eb] rounded-xl text-[#1a1a2e] placeholder-[#9ca3af] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/20 transition-all duration-300"
+                className="w-full px-4 py-3 bg-white border border-[#e5e7eb] rounded-xl text-[#1a1a2e] placeholder-[#9ca3af] focus:outline-none focus:border-[#F97316] focus:ring-2 focus:ring-[#F97316]/20 transition-all duration-300"
                 placeholder="Enter your password"
                 value={formData.password}
                 onChange={(e) =>
@@ -124,13 +124,13 @@ export default function LoginPage() {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 rounded border-[#d1d5db] text-[#6366f1] focus:ring-[#6366f1]"
+                    className="w-4 h-4 rounded border-[#d1d5db] text-[#F97316] focus:ring-[#6366f1]"
                   />
                   <span className="text-sm text-[#6b7280]">Remember me</span>
                 </label>
                 <Link
                   href="/forgot-password"
-                  className="text-sm text-[#6366f1] hover:text-[#4f46e5] transition-colors"
+                  className="text-sm text-[#F97316] hover:text-[#ea580c] transition-colors"
                 >
                   Forgot password?
                 </Link>
@@ -139,7 +139,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full py-3 px-4 bg-[#1a1a2e] hover:bg-[#2d2d3a] text-white font-medium rounded-xl transition-all duration-300 shadow-lg shadow-[#1a1a2e]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3 px-4 bg-[#F97316] hover:bg-[#ea580c] text-white font-medium rounded-xl transition-all duration-300 shadow-lg shadow-[#F97316]/20 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={loading}
             >
               {loading ? (
@@ -220,7 +220,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}
-              className="text-[#6366f1] hover:text-[#4f46e5] font-medium transition-colors"
+              className="text-[#F97316] hover:text-[#ea580c] font-medium transition-colors"
             >
               {isLogin ? "Sign up" : "Sign in"}
             </button>
@@ -228,60 +228,48 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="hidden lg:flex flex-1 relative overflow-hidden bg-[#1a1a2e]">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#1a1a2e] to-[#2d2d3a]" />
+      <div className="hidden lg:flex flex-1 relative overflow-hidden bg-[#0f172a]">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0f172a] to-[#1e293b]" />
         <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#6366f1] rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[#8b5cf6] rounded-full blur-3xl" />
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#F97316] rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[#8B5CF6] rounded-full blur-3xl" />
         </div>
         <div className="relative z-10 flex flex-col justify-center px-16 py-8">
           <div className="max-w-md">
             <div className="mb-8">
-              <div className="w-12 h-12 rounded-xl bg-[#6366f1] flex items-center justify-center mb-4">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                  />
-                </svg>
+              <div className="flex items-center gap-3 mb-6">
+                <FriendlyBot size="lg" />
               </div>
               <h2 className="text-4xl font-bold text-white mb-4">
-                Build faster with{" "}
-                <span className="text-[#a5b4fc]">intelligent agents</span>
+                Code faster with{" "}
+                <span className="text-[#F97316]">AI agents</span>
               </h2>
-              <p className="text-[#9ca3af] text-lg">
-                Your AI-powered development workspace with local models,
-                autonomous agents, and privacy-first architecture.
+              <p className="text-slate-400 text-lg">
+                Install WabiSabi in your terminal or VS Code. Autonomous agents
+                that read, write, and run code with local or cloud models.
               </p>
             </div>
 
             <div className="space-y-4">
               {[
                 {
+                  title: "Terminal CLI + VS Code",
+                  desc: "Works where you already code",
+                },
+                {
+                  title: "Local & Cloud Models",
+                  desc: "Ollama (free) or Substratum (cloud)",
+                },
+                {
                   title: "Free Tier Available",
-                  desc: "Try local models at no cost",
-                },
-                {
-                  title: "Privacy First",
-                  desc: "Your data never leaves your infrastructure",
-                },
-                {
-                  title: "Distributed Computing",
-                  desc: "Scale across multiple nodes seamlessly",
+                  desc: "Start with local models at zero cost",
                 },
               ].map((item, idx) => (
                 <div
                   key={idx}
                   className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10"
                 >
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#6366f1] flex items-center justify-center">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#F97316] flex items-center justify-center">
                     <svg
                       className="w-4 h-4 text-white"
                       fill="none"
@@ -298,7 +286,7 @@ export default function LoginPage() {
                   </div>
                   <div>
                     <h4 className="font-semibold text-white">{item.title}</h4>
-                    <p className="text-sm text-[#9ca3af]">{item.desc}</p>
+                    <p className="text-sm text-slate-400">{item.desc}</p>
                   </div>
                 </div>
               ))}
@@ -309,13 +297,13 @@ export default function LoginPage() {
                 {[1, 2, 3, 4].map((i) => (
                   <div
                     key={i}
-                    className="w-10 h-10 rounded-full bg-[#6366f1] border-2 border-[#1a1a2e] flex items-center justify-center text-white text-sm font-medium"
+                    className="w-10 h-10 rounded-full bg-[#F97316] border-2 border-[#0f172a] flex items-center justify-center text-white text-sm font-medium"
                   >
                     {i}
                   </div>
                 ))}
               </div>
-              <div className="text-[#9ca3af]">
+              <div className="text-slate-400">
                 <span className="text-white font-semibold">2,500+</span>{" "}
                 developers trust us
               </div>
