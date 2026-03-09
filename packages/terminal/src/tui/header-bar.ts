@@ -12,6 +12,7 @@ import { Panel } from "./panel.js";
 import { style, padAnsi, visibleLength } from "./ansi.js";
 import type { HeaderInfo } from "./types.js";
 import { showBannerCompact } from "./banner.js";
+import { getProfileIndicator } from "../profiles/index.js";
 import chalk from "chalk";
 
 export class HeaderBar extends Panel {
@@ -48,12 +49,14 @@ export class HeaderBar extends Panel {
     const ctxStr = ctxPct > 0 ? ctxColor(`${ctxPct}%`) : "";
 
     const agentSeg = chalk.bgCyan.black.bold(` ${this.info.agentLabel} `);
+    const profileInd = getProfileIndicator();
+    const profileSeg = profileInd ? ` ${profileInd}` : "";
     const modelSeg = chalk.white.bold(` ${this.info.model} `);
     const providerSeg = chalk.white(`${this.info.provider}`);
     const sessionSeg = chalk.white(`ses:${this.info.sessionId.slice(0, 6)}`);
     const tokenSeg = chalk.yellow.bold(tokStr);
 
-    const leftPart = `${agentSeg} ${modelSeg}${chalk.white("│")} ${providerSeg}`;
+    const leftPart = `${agentSeg}${profileSeg} ${modelSeg}${chalk.white("│")} ${providerSeg}`;
     const rightPart = `${sessionSeg} ${chalk.white("│")} ${tokenSeg}${ctxStr ? ` ${ctxStr}` : ""}`;
 
     const leftLen = visibleLength(leftPart);

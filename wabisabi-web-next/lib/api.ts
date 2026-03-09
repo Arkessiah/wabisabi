@@ -31,89 +31,95 @@ api.interceptors.response.use(
   },
 );
 
-export async function healthCheck() {
-  const response = await api.get("/health");
+// ── Auth ──────────────────────────────────────────────
+
+export async function login(email: string, password: string) {
+  const response = await api.post("/auth/login", { email, password });
+  const token = response.data.accessToken || response.data.token;
+  if (token) localStorage.setItem("token", token);
+  if (response.data.refreshToken) localStorage.setItem("refreshToken", response.data.refreshToken);
   return response.data;
 }
+
+export async function register(data: { email: string; password: string; name?: string }) {
+  const response = await api.post("/auth/register", data);
+  const token = response.data.accessToken || response.data.token;
+  if (token) localStorage.setItem("token", token);
+  if (response.data.refreshToken) localStorage.setItem("refreshToken", response.data.refreshToken);
+  return response.data;
+}
+
+export async function logout() {
+  try { await api.post("/auth/logout"); } catch {}
+  localStorage.removeItem("token");
+  localStorage.removeItem("refreshToken");
+}
+
+export async function getMe() {
+  const response = await api.get("/me");
+  return response.data;
+}
+
+// ── Billing ───────────────────────────────────────────
+
+export async function getBillingAccount() {
+  const response = await api.get("/v1/billing/account");
+  return response.data;
+}
+
+export async function getBillingBalance() {
+  const response = await api.get("/v1/billing/balance");
+  return response.data;
+}
+
+export async function getBillingPlans() {
+  const response = await api.get("/v1/billing/plans");
+  return response.data;
+}
+
+export async function changePlan(planId: string) {
+  const response = await api.post("/v1/billing/plan", { planId });
+  return response.data;
+}
+
+export async function getBillingUsage(days = 30) {
+  const response = await api.get(`/v1/billing/usage?days=${days}`);
+  return response.data;
+}
+
+export async function getBillingTransactions(limit = 50) {
+  const response = await api.get(`/v1/billing/transactions?limit=${limit}`);
+  return response.data;
+}
+
+// ── API Keys ──────────────────────────────────────────
+
+export async function listApiKeys() {
+  const response = await api.get("/auth/api-keys");
+  return response.data;
+}
+
+export async function createApiKey(name: string, expiresInDays?: number) {
+  const response = await api.post("/auth/api-keys", { name, expiresInDays });
+  return response.data;
+}
+
+export async function revokeApiKey(id: string) {
+  const response = await api.delete(`/auth/api-keys/${id}`);
+  return response.data;
+}
+
+// ── Models ────────────────────────────────────────────
 
 export async function listModels() {
   const response = await api.get("/v1/models");
   return response.data;
 }
 
-export async function chatCompletion(
-  messages: { role: string; content: string }[],
-  model: string,
-  stream = false,
-) {
-  const response = await api.post("/v1/chat/completions", {
-    messages,
-    model,
-    stream,
-  });
-  return response.data;
-}
+// ── Health ────────────────────────────────────────────
 
-export async function getUserProfile() {
-  const response = await api.get("/auth/profile");
-  return response.data;
-}
-
-export async function login(email: string, password: string) {
-  const response = await api.post("/auth/login", { email, password });
-  const token = response.data.accessToken || response.data.token;
-  if (token) {
-    localStorage.setItem("token", token);
-  }
-  if (response.data.refreshToken) {
-    localStorage.setItem("refreshToken", response.data.refreshToken);
-  }
-  return response.data;
-}
-
-export async function register(data: {
-  email: string;
-  password: string;
-  name: string;
-}) {
-  const response = await api.post("/auth/register", data);
-  const token = response.data.accessToken || response.data.token;
-  if (token) {
-    localStorage.setItem("token", token);
-  }
-  if (response.data.refreshToken) {
-    localStorage.setItem("refreshToken", response.data.refreshToken);
-  }
-  return response.data;
-}
-
-export async function getProjects() {
-  const response = await api.get("/projects");
-  return response.data;
-}
-
-export async function createProject(name: string, description: string) {
-  const response = await api.post("/projects", { name, description });
-  return response.data;
-}
-
-export async function getUsageStats() {
-  const response = await api.get("/usage/stats");
-  return response.data;
-}
-
-export async function getModels() {
-  const response = await api.get("/models");
-  return response.data;
-}
-
-export async function getAgents() {
-  const response = await api.get("/agents");
-  return response.data;
-}
-
-export async function createAgent(config: any, task: any) {
-  const response = await api.post("/agents", { config, task });
+export async function healthCheck() {
+  const response = await api.get("/health");
   return response.data;
 }
 

@@ -28,9 +28,5 @@
     "serialize-javascript": ">=7.0.3",
     "minimatch": ">=9.0.5"
   },
-  "devDependencies": {
-    "autoprefixer": "^10.4.24",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.18"
-  }
+  "devDependencies": {}
 }

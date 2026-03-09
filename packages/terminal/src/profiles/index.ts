@@ -438,3 +438,113 @@ export function getProfileSummary(): string {
 
   return parts.length > 0 ? parts.join(" + ") : "Default (no profile)";
 }
+
+// ── Presets (combined hat + profile + style) ─────────────
+
+export interface ProfilePreset {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  hat: string | null;
+  profile: string | null;
+  style: string | null;
+}
+
+export const PROFILE_PRESETS: Record<string, ProfilePreset> = {
+  "security-audit": {
+    id: "security-audit",
+    name: "Security Audit",
+    emoji: "🛡️",
+    description: "Black hat + Security + Formal — Find vulnerabilities and risks",
+    hat: "black",
+    profile: "security",
+    style: "formal",
+  },
+  "code-review": {
+    id: "code-review",
+    name: "Code Review",
+    emoji: "🔎",
+    description: "White hat + Auditor + Technical — Objective quality review",
+    hat: "white",
+    profile: "auditor",
+    style: "technical",
+  },
+  "creative-design": {
+    id: "creative-design",
+    name: "Creative Design",
+    emoji: "💡",
+    description: "Green hat + Architect + Colloquial — Brainstorm new approaches",
+    hat: "green",
+    profile: "architect",
+    style: "colloquial",
+  },
+  "frontend-ux": {
+    id: "frontend-ux",
+    name: "Frontend & UX",
+    emoji: "🎨",
+    description: "Yellow hat + Frontend + Mentor — Build great user experiences",
+    hat: "yellow",
+    profile: "frontend",
+    style: "mentor",
+  },
+  "backend-scale": {
+    id: "backend-scale",
+    name: "Backend & Scale",
+    emoji: "⚙️",
+    description: "Black hat + Backend + Technical — Robust, scalable APIs",
+    hat: "black",
+    profile: "backend",
+    style: "technical",
+  },
+  "devops-deploy": {
+    id: "devops-deploy",
+    name: "DevOps & Deploy",
+    emoji: "🚀",
+    description: "Blue hat + DevOps + Technical — Plan and automate infrastructure",
+    hat: "blue",
+    profile: "devops",
+    style: "technical",
+  },
+  "quick-fix": {
+    id: "quick-fix",
+    name: "Quick Fix",
+    emoji: "⚡",
+    description: "Red hat + Fullstack + Technical — Fast intuitive problem solving",
+    hat: "red",
+    profile: "fullstack",
+    style: "technical",
+  },
+  "learn-teach": {
+    id: "learn-teach",
+    name: "Learn & Teach",
+    emoji: "📚",
+    description: "White hat + Fullstack + Mentor — Understand and explain code",
+    hat: "white",
+    profile: "fullstack",
+    style: "mentor",
+  },
+};
+
+/**
+ * Apply a preset (sets hat + profile + style at once).
+ */
+export function setPreset(presetId: string): boolean {
+  const preset = PROFILE_PRESETS[presetId];
+  if (!preset) return false;
+  activeProfile.hat = preset.hat;
+  activeProfile.profile = preset.profile;
+  activeProfile.style = preset.style;
+  return true;
+}
+
+/**
+ * Get a short indicator string for the TUI header.
+ * Returns empty string if no profile is active.
+ */
+export function getProfileIndicator(): string {
+  const parts: string[] = [];
+  if (activeProfile.hat) parts.push(THINKING_HATS[activeProfile.hat]?.emoji ?? "");
+  if (activeProfile.profile) parts.push(TECHNICAL_PROFILES[activeProfile.profile]?.emoji ?? "");
+  return parts.filter(Boolean).join(" ");
+}

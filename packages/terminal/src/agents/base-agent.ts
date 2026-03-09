@@ -42,6 +42,9 @@ import {
   buildProfilePrompt,
   getProfileSummary,
   getActiveProfile,
+  PROFILE_PRESETS,
+  setPreset,
+  getProfileIndicator,
 } from "../profiles/index.js";
 import { soulManager } from "../soul/index.js";
 import {
@@ -447,6 +450,31 @@ export abstract class BaseAgent {
         this.rebuildSystemMessage();
         configManager.update("profile", getActiveProfile());
         this.io.writeOutput(chalk.green("  All profiles reset to default."));
+        return true;
+      }
+
+      case "preset": {
+        const presetId = parts[1];
+        if (!presetId) {
+          let output = chalk.bold("\n  Profile Presets\n");
+          const active = getActiveProfile();
+          for (const preset of Object.values(PROFILE_PRESETS)) {
+            const isActive = active.hat === preset.hat && active.profile === preset.profile && active.style === preset.style;
+            const marker = isActive ? chalk.green(" (active)") : "";
+            output += `  ${preset.emoji} ${chalk.bold(preset.id.padEnd(16))} ${chalk.dim(preset.description)}${marker}\n`;
+          }
+          output += chalk.dim("\n  Usage: /preset <name>\n");
+          this.io.writeOutput(output);
+          return true;
+        }
+        if (setPreset(presetId)) {
+          const preset = PROFILE_PRESETS[presetId];
+          this.rebuildSystemMessage();
+          configManager.update("profile", getActiveProfile());
+          this.io.writeOutput(chalk.green(`  ${preset.emoji} ${preset.name} activated: ${preset.description}`));
+        } else {
+          this.io.writeOutput(chalk.yellow(`  Unknown preset: ${presetId}. Use /preset to see options.`));
+        }
         return true;
       }
 

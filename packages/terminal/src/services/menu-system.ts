@@ -1,5 +1,5 @@
 /**
- * 🎛️ WabiSabi Menu System
+ * WabiSabi Menu System
  *
  * Interactive menu style OpenCode with Ctrl+P.
  * Supports fuzzy search and keyboard navigation.
@@ -7,9 +7,22 @@
 
 import { AgentType, AGENTS, agentSwitcher } from "./agent-switcher.js";
 import { PrivacyLevel, privacyManager } from "./privacy-manager.js";
+import {
+  THINKING_HATS,
+  TECHNICAL_PROFILES,
+  COMMUNICATION_STYLES,
+  PROFILE_PRESETS,
+  setHat,
+  setProfile,
+  setStyle,
+  setPreset,
+  resetProfile,
+  getActiveProfile,
+} from "../profiles/index.js";
 
 export type MenuCategory =
   | "models"
+  | "profiles"
   | "skills"
   | "plugins"
   | "privacy"
@@ -54,7 +67,7 @@ export class MenuSystem {
 
   private initializeItems(): void {
     this.items = [
-      // 🔤 Models Category
+      // Models Category
       {
         id: "model-llama3.2",
         label: "llama3.2",
@@ -91,7 +104,72 @@ export class MenuSystem {
         action: () => console.log("Add custom model..."),
       },
 
-      // 🔧 Skills Category
+      // Profiles Category — Presets
+      ...Object.values(PROFILE_PRESETS).map((preset, i) => ({
+        id: `preset-${preset.id}`,
+        label: `${preset.emoji} ${preset.name}`,
+        description: preset.description,
+        shortcut: String(i + 1),
+        checked: false,
+        category: "profiles" as MenuCategory,
+        action: () => {
+          setPreset(preset.id);
+          this.refreshItems();
+        },
+      })),
+
+      // Profiles Category — Individual Hats
+      ...Object.values(THINKING_HATS).map((hat) => ({
+        id: `hat-${hat.id}`,
+        label: `${hat.emoji} ${hat.name}`,
+        description: hat.description,
+        checked: false,
+        category: "profiles" as MenuCategory,
+        action: () => {
+          setHat(hat.id);
+          this.refreshItems();
+        },
+      })),
+
+      // Profiles Category — Individual Technical Profiles
+      ...Object.values(TECHNICAL_PROFILES).map((prof) => ({
+        id: `profile-${prof.id}`,
+        label: `${prof.emoji} ${prof.name}`,
+        description: prof.description,
+        checked: false,
+        category: "profiles" as MenuCategory,
+        action: () => {
+          setProfile(prof.id);
+          this.refreshItems();
+        },
+      })),
+
+      // Profiles Category — Styles
+      ...Object.values(COMMUNICATION_STYLES).map((s) => ({
+        id: `style-${s.id}`,
+        label: `📝 ${s.name}`,
+        description: s.description,
+        checked: false,
+        category: "profiles" as MenuCategory,
+        action: () => {
+          setStyle(s.id);
+          this.refreshItems();
+        },
+      })),
+
+      // Profiles Category — Reset
+      {
+        id: "profile-reset",
+        label: "Reset All Profiles",
+        description: "Clear hat, profile, and style",
+        category: "profiles",
+        action: () => {
+          resetProfile();
+          this.refreshItems();
+        },
+      },
+
+      // Skills Category
       {
         id: "skill-read",
         label: "Read",
@@ -129,7 +207,7 @@ export class MenuSystem {
         action: () => console.log("Skill Grep toggled"),
       },
 
-      // 🔌 Plugins Category
+      // Plugins Category
       {
         id: "plugin-claude",
         label: "Claude Code Plugins",
@@ -149,10 +227,10 @@ export class MenuSystem {
         action: () => console.log("OpenCode Plugins toggled"),
       },
 
-      // 🔒 Privacy Category
+      // Privacy Category
       {
         id: "privacy-local",
-        label: "(•) LOCAL ONLY 🛡️",
+        label: "(•) LOCAL ONLY",
         description: "100% offline, no network access",
         shortcut: "1",
         checked: true,
@@ -164,7 +242,7 @@ export class MenuSystem {
       },
       {
         id: "privacy-hybrid",
-        label: "( ) HYBRID 🔶",
+        label: "( ) HYBRID",
         description: "Local models with controlled fallback",
         shortcut: "2",
         checked: false,
@@ -176,7 +254,7 @@ export class MenuSystem {
       },
       {
         id: "privacy-semi",
-        label: "( ) SEMI-REMOTE 🔷",
+        label: "( ) SEMI-REMOTE",
         description: "Substratum backend + shared RAG",
         shortcut: "3",
         checked: false,
@@ -188,7 +266,7 @@ export class MenuSystem {
       },
       {
         id: "privacy-full",
-        label: "( ) FULL REMOTE 🔴",
+        label: "( ) FULL REMOTE",
         description: "All features enabled (not recommended)",
         shortcut: "4",
         checked: false,
@@ -199,7 +277,7 @@ export class MenuSystem {
         },
       },
 
-      // ⚙️ Settings Category
+      // Settings Category
       {
         id: "setting-temperature",
         label: "Temperature: 0.7",
@@ -218,7 +296,7 @@ export class MenuSystem {
       },
       {
         id: "setting-streaming",
-        label: "Streaming: [✓] Enabled",
+        label: "Streaming: Enabled",
         description: "Enable streaming responses",
         shortcut: "3",
         category: "settings",
@@ -230,7 +308,7 @@ export class MenuSystem {
   }
 
   /**
-   * 📂 Change category
+   * Change category
    */
   setCategory(category: MenuCategory): void {
     this.state.category = category;
@@ -240,7 +318,7 @@ export class MenuSystem {
   }
 
   /**
-   * 🔍 Filter items by search query
+   * Filter items by search query
    */
   setSearchQuery(query: string): void {
     this.state.searchQuery = query;
@@ -266,17 +344,11 @@ export class MenuSystem {
     );
   }
 
-  /**
-   * ⬆️ Navigate up
-   */
   moveUp(): void {
     this.state.selectedIndex = Math.max(0, this.state.selectedIndex - 1);
     this.notifyListeners();
   }
 
-  /**
-   * ⬇️ Navigate down
-   */
   moveDown(): void {
     this.state.selectedIndex = Math.min(
       this.state.filteredItems.length - 1,
@@ -285,9 +357,6 @@ export class MenuSystem {
     this.notifyListeners();
   }
 
-  /**
-   * ↵ Select current item
-   */
   select(): void {
     const item = this.state.filteredItems[this.state.selectedIndex];
     if (item?.action) {
@@ -296,9 +365,6 @@ export class MenuSystem {
     this.notifyListeners();
   }
 
-  /**
-   * 🔄 Toggle checkbox
-   */
   toggle(): void {
     const item = this.state.filteredItems[this.state.selectedIndex];
     if (item?.checked !== undefined) {
@@ -307,33 +373,21 @@ export class MenuSystem {
     }
   }
 
-  /**
-   * 📖 Get current state
-   */
   getState(): MenuState {
     return { ...this.state };
   }
 
-  /**
-   * 🚪 Open menu
-   */
   open(): void {
     this.state.isOpen = true;
     this.refreshItems();
     this.notifyListeners();
   }
 
-  /**
-   * 🚪 Close menu
-   */
   close(): void {
     this.state.isOpen = false;
     this.notifyListeners();
   }
 
-  /**
-   * 🔄 Toggle menu
-   */
   toggleMenu(): void {
     if (this.state.isOpen) {
       this.close();
@@ -342,9 +396,6 @@ export class MenuSystem {
     }
   }
 
-  /**
-   * 📋 Subscribe to changes
-   */
   onChange(callback: (state: MenuState) => void): () => void {
     this.listeners.push(callback);
     return () => {
@@ -357,7 +408,7 @@ export class MenuSystem {
   }
 
   private refreshItems(): void {
-    // Update checked states based on current configuration
+    // Update privacy checked states
     const privacyLevel = privacyManager.getLevel();
     this.items.find((i) => i.id === "privacy-local")!.checked =
       privacyLevel === PrivacyLevel.LEVEL_1_LOCAL_ONLY;
@@ -368,26 +419,42 @@ export class MenuSystem {
     this.items.find((i) => i.id === "privacy-full")!.checked =
       privacyLevel === PrivacyLevel.LEVEL_4_FULL_REMOTE;
 
+    // Update profile checked states
+    const active = getActiveProfile();
+    for (const item of this.items) {
+      if (item.id.startsWith("hat-")) {
+        item.checked = active.hat === item.id.replace("hat-", "");
+      } else if (item.id.startsWith("profile-") && item.id !== "profile-reset") {
+        item.checked = active.profile === item.id.replace("profile-", "");
+      } else if (item.id.startsWith("style-")) {
+        item.checked = active.style === item.id.replace("style-", "");
+      } else if (item.id.startsWith("preset-")) {
+        const presetId = item.id.replace("preset-", "");
+        const preset = PROFILE_PRESETS[presetId];
+        item.checked = preset
+          ? active.hat === preset.hat && active.profile === preset.profile && active.style === preset.style
+          : false;
+      }
+    }
+
     this.filterItems();
   }
 
-  /**
-   * 🎨 Render menu as text (for CLI)
-   */
   renderToText(): string {
     if (!this.state.isOpen) return "";
 
     const categoryLabels: Record<MenuCategory, string> = {
-      models: "🔤 Models",
-      skills: "🔧 Skills",
-      plugins: "🔌 Plugins",
-      privacy: "🔒 Privacy",
-      settings: "⚙️ Settings",
-      project: "📦 Project",
+      models: "Models",
+      profiles: "Profiles",
+      skills: "Skills",
+      plugins: "Plugins",
+      privacy: "Privacy",
+      settings: "Settings",
+      project: "Project",
     };
 
     const categoryKeys = Object.keys(categoryLabels) as MenuCategory[];
-    const header = `┌─────────────────────────────────────────────────────┐\n│  🔍 WabiSabi Configuration (Ctrl+P to close)        │\n├─────────────────────────────────────────────────────┤`;
+    const header = `┌─────────────────────────────────────────────────────┐\n│  WabiSabi Configuration (Ctrl+P to close)           │\n├─────────────────────────────────────────────────────┤`;
 
     let result = header + "\n";
 
@@ -395,7 +462,7 @@ export class MenuSystem {
     result += "│                                                     │\n│  ";
     categoryKeys.forEach((cat) => {
       const label = categoryLabels[cat];
-      const marker = cat === this.state.category ? "▶" : " ";
+      const marker = cat === this.state.category ? ">" : " ";
       result += `${marker} ${label}  `;
     });
     result =
@@ -405,13 +472,12 @@ export class MenuSystem {
     // Show items
     result += "├─────────────────────────────────────────────────────┤\n";
     this.state.filteredItems.forEach((item, index) => {
-      const marker = index === this.state.selectedIndex ? "▶" : " ";
+      const marker = index === this.state.selectedIndex ? ">" : " ";
       const checkmark =
-        item.checked === true ? "[✓]" : item.checked === false ? "[ ]" : "   ";
+        item.checked === true ? "[*]" : item.checked === false ? "[ ]" : "   ";
       const label = item.label;
       const desc = item.description || "";
 
-      // Truncate long lines
       const maxLen = 50;
       let displayLabel = label;
       if (displayLabel.length > maxLen) {
