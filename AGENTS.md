@@ -169,7 +169,14 @@ Se persisten en `~/.wabisabi/config.jsonc`.
 /hat [name]       Cambiar sombrero de pensamiento
 /profile [name]   Cambiar perfil tecnico
 /style [name]     Cambiar estilo de comunicacion
+/preset [name]    Cargar preset de perfil (hat+profile+style)
 /reset            Resetear todos los perfiles
+/autofix [N]      Auto-fix loop: commit→fix→test→keep/revert (max N intentos)
+/program          Interfaz de direccion PROGRAM.md
+/program init     Crear PROGRAM.md con template
+/program next     Iniciar siguiente objetivo pendiente
+/program done <N> Marcar objetivo N como completado
+/experiments      Ver log de experimentos
 exit              Salir
 ```
 
@@ -387,3 +394,49 @@ Mismos campos, se mergea con la global (proyecto gana).
 
 - Todos los commits van **sin Co-Authored-By** salvo indicacion explicita del usuario.
 - No agregar firmas, trailers ni metadata automatica a los mensajes de commit.
+
+---
+
+## Workflow Rules for Agents
+
+Reglas obligatorias para todos los agentes en todas las sesiones.
+
+### 1. Planificar antes de ejecutar
+
+Toda tarea con **más de 3 pasos** requiere:
+1. Crear un plan con los pasos numerados
+2. Presentar el plan al usuario y esperar OK
+3. Ejecutar paso a paso, marcando progreso
+
+Tareas simples (≤3 pasos) se ejecutan directamente.
+
+### 2. Delegar con sub-agentes
+
+- Usar sub-agentes para investigación, exploración de codebase y tareas paralelas independientes.
+- No duplicar trabajo: si un sub-agente investiga algo, no repetir la misma búsqueda en el agente principal.
+- Elegir el tipo de sub-agente adecuado (Explore, Plan, test-runner, etc.) según la tarea.
+
+### 3. Auto-corrección automática
+
+- Si un comando falla, un test no pasa o un build rompe: **corregir inmediatamente** sin preguntar.
+- Diagnosticar la causa raíz antes de reintentar.
+- No hacer brute-force: si el mismo approach falla 2 veces, cambiar de estrategia.
+
+### 4. Estándar de calidad: revisión de ingeniero experto
+
+Antes de dar por terminada cualquier tarea, preguntarse:
+> "¿Un ingeniero senior experto aprobaría este código/solución?"
+
+Verificar:
+- No hay code smells, anti-patterns ni vulnerabilidades
+- El código es limpio, legible y mantenible
+- Los edge cases están cubiertos
+- No se introdujeron regresiones
+
+### 5. Documentación interna bilingüe
+
+Toda documentación interna del proyecto se mantiene en dos idiomas:
+- **`DOC/EN/`** — Versión en inglés
+- **`DOC/ES/`** — Versión en español
+
+Cuando se crea o actualiza documentación, ambas versiones deben existir y estar sincronizadas.

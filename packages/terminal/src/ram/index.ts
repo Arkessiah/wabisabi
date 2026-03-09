@@ -25,6 +25,7 @@ import {
   type PinnedItem,
   type ActiveFile,
   type ActiveTask,
+  type ExperimentEntry,
   type DeviceProfile,
   type ComplexityLevel,
 } from "./schema.js";
@@ -37,6 +38,7 @@ const RAM_FILE = join(RAM_DIR, "ram.json");
 const MAX_PINS = 50;
 const MAX_ACTIVE_FILES = 30;
 const MAX_ACTIVE_TASKS = 20;
+const MAX_EXPERIMENTS = 100;
 const SAVE_DEBOUNCE_MS = 3_000;
 
 // ── Device Profile Presets ───────────────────────────────────
@@ -414,6 +416,51 @@ export class RamManager {
     return this.ram.activeTasks.filter((t) => t.status !== "completed");
   }
 
+  // ── Experiment Log ─────────────────────────────────────
+
+  logExperiment(entry: Omit<ExperimentEntry, "id" | "createdAt">): ExperimentEntry {
+    const experiment: ExperimentEntry = {
+      ...entry,
+      id: randomUUID().slice(0, 8),
+      createdAt: new Date().toISOString(),
+    };
+
+    this.ram.experiments.push(experiment);
+
+    // Enforce limit - keep most recent
+    if (this.ram.experiments.length > MAX_EXPERIMENTS) {
+      this.ram.experiments = this.ram.experiments.slice(-MAX_EXPERIMENTS);
+    }
+
+    this.scheduleSave();
+    return experiment;
+  }
+
+  getExperiments(limit = 20): ExperimentEntry[] {
+    return this.ram.experiments.slice(-limit);
+  }
+
+  getRecentFailures(limit = 10): ExperimentEntry[] {
+    return this.ram.experiments
+      .filter((e) => e.result === "fail" || e.result === "crash")
+      .slice(-limit);
+  }
+
+  /**
+   * Check if a similar experiment was already tried and failed.
+   * Prevents re-exploring known dead ends (autoresearch pattern).
+   */
+  wasAlreadyTried(description: string): ExperimentEntry | null {
+    const lower = description.toLowerCase();
+    return (
+      this.ram.experiments.find(
+        (e) =>
+          (e.result === "fail" || e.result === "crash") &&
+          e.description.toLowerCase().includes(lower),
+      ) ?? null
+    );
+  }
+
   // ── Device Profile ─────────────────────────────────────
 
   setDeviceProfile(type: string): DeviceProfile {
@@ -489,6 +536,15 @@ export class RamManager {
       }
     }
 
+    // Recent experiment failures (prevent re-exploring dead ends)
+    const failures = this.getRecentFailures(5);
+    if (failures.length > 0 && budget.ramContextRatio >= 0.3) {
+      parts.push("── FAILED EXPERIMENTS (do not retry) ──");
+      for (const f of failures) {
+        parts.push(`- [${f.result}] ${f.description}${f.metric ? ` (${f.metric})` : ""}`);
+      }
+    }
+
     // Active files (for moderate/complex)
     if (budget.ramContextRatio >= 0.5) {
       const files = this.getActiveFiles(5);
@@ -513,6 +569,7 @@ export class RamManager {
     lines.push(`  Pins:       ${this.ram.pins.length}`);
     lines.push(`  Files:      ${this.ram.activeFiles.length} tracked`);
     lines.push(`  Tasks:      ${this.getActiveTasks().length} active`);
+    lines.push(`  Experiments: ${this.ram.experiments.length} logged`);
     lines.push(`  Sessions:   ${this.ram.metadata.sessionCount}`);
     if (this.ram.lastSessionSummary) {
       lines.push(

@@ -54,6 +54,20 @@ export const DeviceProfileSchema = z.object({
 
 export const ComplexityLevelSchema = z.enum(["simple", "moderate", "complex"]);
 
+// ── Experiment Log ───────────────────────────────────────
+
+export const ExperimentEntrySchema = z.object({
+  id: z.string(),
+  description: z.string(),
+  result: z.enum(["success", "fail", "crash", "skipped"]),
+  metric: z.string().optional(), // e.g. "tests: 125/125" or "build: ok"
+  diff: z.string().optional(), // short summary of what changed
+  commitHash: z.string().optional(),
+  reverted: z.boolean().default(false),
+  duration: z.number().default(0), // ms
+  createdAt: z.string(),
+});
+
 // ── Full RAM Schema ──────────────────────────────────────────
 
 export const RamSchema = z.object({
@@ -65,6 +79,7 @@ export const RamSchema = z.object({
   pins: z.array(PinnedItemSchema).default([]),
   activeFiles: z.array(ActiveFileSchema).default([]),
   activeTasks: z.array(ActiveTaskSchema).default([]),
+  experiments: z.array(ExperimentEntrySchema).default([]),
   deviceProfile: DeviceProfileSchema.default({}),
   lastSessionSummary: z.string().nullable().default(null),
 });
@@ -74,6 +89,7 @@ export const RamSchema = z.object({
 export type PinnedItem = z.infer<typeof PinnedItemSchema>;
 export type ActiveFile = z.infer<typeof ActiveFileSchema>;
 export type ActiveTask = z.infer<typeof ActiveTaskSchema>;
+export type ExperimentEntry = z.infer<typeof ExperimentEntrySchema>;
 export type DeviceProfile = z.infer<typeof DeviceProfileSchema>;
 export type ComplexityLevel = z.infer<typeof ComplexityLevelSchema>;
 export type Ram = z.infer<typeof RamSchema>;

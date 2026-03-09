@@ -148,6 +148,7 @@ BASE/
 !README.md
 !SECURITY.md
 !.github/*.md
+!DOC/**/*.md
 
 # Private planning and infrastructure docs (never commit)
 PRODUCTION_ROADMAP.md

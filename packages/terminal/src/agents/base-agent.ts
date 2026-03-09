@@ -61,6 +61,8 @@ import type { TerminalIO } from "../tui/types.js";
 import { LegacyTerminalIO } from "../tui/legacy-io.js";
 import { agentSwitcher } from "../services/agent-switcher.js";
 import { cortexEngine } from "../cortex/index.js";
+import { detectTestCommand, runAutofixLoop, type AutofixConfig } from "../services/autofix-loop.js";
+import { ProgramMdManager } from "../context/program-md.js";
 
 // Tools that modify files - auto-log to PLAN.md
 const MUTATING_TOOLS = new Set(["write", "edit", "bash"]);
@@ -111,9 +113,15 @@ export abstract class BaseAgent {
     const profilePrompt = buildProfilePrompt();
     const soulContext = soulManager.buildSoulContext();
     const ramContext = ramManager.buildRamContext(complexity);
+    const programContext = (() => {
+      const cwd = projectContext.getProjectRoot();
+      if (!cwd) return "";
+      const pm = new ProgramMdManager(cwd);
+      return pm.buildProgramContext();
+    })();
     this.conversationHistory[0] = {
       role: "system",
-      content: `${this.getSystemPrompt()}${profilePrompt}${soulContext}${ramContext}\n\n${contextPrompt}`,
+      content: `${this.getSystemPrompt()}${profilePrompt}${soulContext}${ramContext}${programContext}\n\n${contextPrompt}`,
     };
   }
 
@@ -649,6 +657,173 @@ export abstract class BaseAgent {
             chalk.dim("  ──────────────────────────────────\n") +
             chalk.bold(`  Tokens saved: ~${stats.tokensSaved.toLocaleString()}\n`),
         );
+        return true;
+      }
+
+      case "autofix": {
+        const maxStr = parts[1];
+        const max = maxStr ? parseInt(maxStr) : 5;
+        const cwd = projectContext.getProjectRoot() || process.cwd();
+        const testCmd = detectTestCommand(cwd);
+
+        this.io.writeOutput(chalk.bold("\n  Starting Auto-Fix Loop"));
+        this.io.writeOutput(chalk.dim(`  Test command: ${testCmd}`));
+        this.io.writeOutput(chalk.dim(`  Max attempts: ${max}\n`));
+
+        const config: AutofixConfig = {
+          maxAttempts: max,
+          testCommand: testCmd,
+          cwd,
+          timeout: 120_000,
+        };
+
+        const result = await runAutofixLoop(
+          config,
+          async (testOutput: string, attempt: number) => {
+            // Feed the test failure to the LLM and let it fix
+            const fixPrompt = `Tests are failing (attempt ${attempt}/${max}). Fix the code.\n\nTest output:\n\`\`\`\n${testOutput.slice(-1000)}\n\`\`\`\n\nAnalyze the error, identify the root cause, and fix it. Only modify what's necessary.`;
+            this.conversationHistory.push({ role: "user", content: fixPrompt });
+            const streamResult = await this.streamResponse();
+
+            // Execute any tool calls from the fix
+            let currentResult = streamResult;
+            let iterations = 0;
+            while (currentResult.tool_calls.length > 0 && iterations < 10) {
+              for (const call of currentResult.tool_calls) {
+                const toolResult = await this.executeToolCall(call);
+                this.conversationHistory.push({
+                  role: "tool",
+                  content: toolResult,
+                  tool_call_id: call.id,
+                });
+              }
+              currentResult = await this.streamResponse();
+              iterations++;
+            }
+
+            if (currentResult.content) {
+              this.conversationHistory.push({
+                role: "assistant",
+                content: currentResult.content,
+              });
+            }
+
+            return currentResult.content?.slice(0, 100) || `fix attempt ${attempt}`;
+          },
+          (msg) => this.io.writeOutput(msg),
+        );
+
+        if (result.success) {
+          this.io.writeOutput(chalk.green(`\n  ✓ ${result.finalMessage}`));
+        } else {
+          this.io.writeOutput(chalk.red(`\n  ✗ ${result.finalMessage}`));
+        }
+        return true;
+      }
+
+      case "program": {
+        const subCmd = parts[1];
+        const cwd = projectContext.getProjectRoot() || process.cwd();
+        const programMd = new ProgramMdManager(cwd);
+
+        if (!subCmd) {
+          // Show current PROGRAM.md status
+          if (!programMd.exists()) {
+            this.io.writeOutput(
+              chalk.dim("  No PROGRAM.md found.\n") +
+              chalk.dim("  Use /program init to create one.\n") +
+              chalk.dim("  Use /program set <objective> to add objectives.\n"),
+            );
+            return true;
+          }
+
+          const objectives = programMd.parseObjectives();
+          const constraints = programMd.parseConstraints();
+          let output = chalk.bold("\n  PROGRAM.md (Direction Interface)\n");
+          output += chalk.dim("  ──────────────────────────────────\n");
+
+          if (objectives.length > 0) {
+            output += chalk.bold("  Objectives:\n");
+            for (const obj of objectives) {
+              const icon = obj.status === "done" ? "✓" : obj.status === "in_progress" ? "→" : obj.status === "blocked" ? "✗" : "○";
+              const color = obj.status === "done" ? chalk.green : obj.status === "in_progress" ? chalk.cyan : obj.status === "blocked" ? chalk.red : chalk.white;
+              output += `  ${color(`${icon} ${obj.id}. ${obj.text}`)}\n`;
+            }
+          }
+
+          if (constraints.length > 0) {
+            output += chalk.bold("\n  Constraints:\n");
+            for (const c of constraints) {
+              output += chalk.dim(`  - ${c.text}\n`);
+            }
+          }
+
+          output += chalk.dim("  ──────────────────────────────────\n");
+          this.io.writeOutput(output);
+          return true;
+        }
+
+        if (subCmd === "init") {
+          if (programMd.exists()) {
+            this.io.writeOutput(chalk.yellow("  PROGRAM.md already exists."));
+            return true;
+          }
+          const name = projectContext.getProjectRoot()?.split("/").pop() || "project";
+          programMd.create(name);
+          this.rebuildSystemMessage();
+          this.io.writeOutput(chalk.green("  PROGRAM.md created. Edit it to define your objectives."));
+          return true;
+        }
+
+        if (subCmd === "next") {
+          const next = programMd.getNextObjective();
+          if (!next) {
+            this.io.writeOutput(chalk.green("  All objectives completed or none defined."));
+            return true;
+          }
+          programMd.updateObjectiveStatus(next.id, "in_progress");
+          programMd.addLogEntry(`Started: ${next.text}`);
+          this.rebuildSystemMessage();
+          this.io.writeOutput(chalk.cyan(`  → Starting objective ${next.id}: ${next.text}`));
+          return true;
+        }
+
+        if (subCmd === "done") {
+          const idStr = parts[2];
+          if (!idStr) {
+            this.io.writeOutput(chalk.dim("  Usage: /program done <id>"));
+            return true;
+          }
+          programMd.updateObjectiveStatus(parseInt(idStr), "done");
+          programMd.addLogEntry(`Completed objective ${idStr}`);
+          this.rebuildSystemMessage();
+          this.io.writeOutput(chalk.green(`  ✓ Objective ${idStr} marked as done.`));
+          return true;
+        }
+
+        this.io.writeOutput(
+          chalk.dim("  Commands:\n") +
+          chalk.dim("  /program          Show status\n") +
+          chalk.dim("  /program init     Create PROGRAM.md\n") +
+          chalk.dim("  /program next     Start next pending objective\n") +
+          chalk.dim("  /program done <N> Mark objective N as done\n"),
+        );
+        return true;
+      }
+
+      case "experiments": {
+        const exps = ramManager.getExperiments(15);
+        if (exps.length === 0) {
+          this.io.writeOutput(chalk.dim("  No experiments logged yet."));
+          return true;
+        }
+        let output = chalk.bold("\n  Experiment Log\n");
+        for (const exp of exps) {
+          const icon = exp.result === "success" ? chalk.green("✓") : exp.result === "fail" ? chalk.red("✗") : exp.result === "crash" ? chalk.red("💥") : chalk.yellow("⊘");
+          const revert = exp.reverted ? chalk.dim(" (reverted)") : "";
+          output += `  ${icon} ${chalk.dim(exp.createdAt.slice(0, 16))} ${exp.description.slice(0, 60)}${revert}\n`;
+        }
+        this.io.writeOutput(output);
         return true;
       }
 
