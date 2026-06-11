@@ -1,0 +1,33 @@
+# Source code — only the bundled dist/extension.js ships.
+src/**
+test/**
+scripts/**
+node_modules/**
+**/*.ts
+**/*.map
+**/*.tsbuildinfo
+tsconfig.json
+esbuild.config.mjs
+
+# Workspace / build artifacts
+.vscode/**
+.github/**
+.git/**
+**/.DS_Store
+
+# Old tsc-generated files in dist — only dist/extension.js (bundled) should ship.
+dist/agents-provider.*
+dist/chat-provider.*
+dist/chat-service.*
+dist/config.*
+dist/inline-completion.*
+dist/llm-client.*
+dist/onboarding.*
+dist/provider-manager.*
+dist/status-bar.*
+dist/tasks-provider.*
+dist/tool-executor.*
+dist/test/**
+
+# Other packages in the monorepo
+../**

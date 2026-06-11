@@ -1,9 +1,10 @@
 {
-  "name": "@wabisabi/vscode",
+  "name": "wabisabi-ai",
   "displayName": "WabiSabi AI",
-  "description": "WabiSabi AI coding agent for VS Code",
+  "description": "WabiSabi AI coding agent for VS Code — pairs with the WabiSabi CLI and your Substratum backend",
   "version": "0.1.0",
   "publisher": "wabisabi",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -176,15 +177,20 @@
     }
   },
   "scripts": {
-    "build": "tsc -p .",
-    "watch": "tsc -watch -p .",
-    "package": "vsce package"
+    "typecheck": "tsc -p . --noEmit",
+    "clean": "rm -rf dist",
+    "build": "bun run clean && node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "vscode:prepublish": "bun run build",
+    "package": "bun run build && vsce package --no-dependencies --out wabisabi-ai.vsix"
   },
   "dependencies": {
     "@wabisabi/core": "file:../core"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.24.0",
     "typescript": "^5.3.0"
   }
 }

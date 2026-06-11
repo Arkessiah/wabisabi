@@ -16,7 +16,7 @@ import { checkFirstRun } from "./onboarding";
 
 let statusBar: StatusBarManager;
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   const config = new WabiSabiConfig();
   statusBar = new StatusBarManager(config);
 
@@ -144,8 +144,10 @@ export function activate(context: vscode.ExtensionContext) {
   // Status bar
   context.subscriptions.push(statusBar);
 
-  // First-run check
-  checkFirstRun(context, config);
+  // First-run check — non-blocking prompt. Honoured 'Run Setup' kicks the
+  // onboarding command which runs in the background; we don't await here so a
+  // user cancelling the toast doesn't stall activation.
+  await checkFirstRun(context, config);
 }
 
 export function deactivate() {

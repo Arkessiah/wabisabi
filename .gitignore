@@ -162,3 +162,6 @@ TODO.md
 # Benchmark reports (generated)
 benchmarks/report.json
 
+
+# VSCode extension build artifacts
+*.vsix

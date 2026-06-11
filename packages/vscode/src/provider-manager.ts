@@ -10,6 +10,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as crypto from "crypto";
+import { execFileSync } from "child_process";
 import type { WabiSabiConfig } from "./config";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -23,22 +24,82 @@ export interface ResolvedProvider {
   bearerToken?: string;
 }
 
-// ── Auth decryption (port of terminal auth/index.ts) ─────────────
+// ── Auth decryption ──────────────────────────────────────────────
+//
+// The CLI's AuthManager (packages/terminal/src/auth/index.ts) writes the
+// encrypted blob using whichever key path is available — OS Keychain first,
+// machine-derived PBKDF2 as fallback. The VS Code extension MUST mirror that
+// resolution order or it will fail to decrypt the file the CLI wrote and the
+// user appears "logged out" inside VS Code despite a valid session on disk.
 
 const AUTH_ALGO = "aes-256-gcm";
 const AUTH_SALT = "wabisabi-auth-v1";
+const KEYCHAIN_SERVICE = "com.wabisabi.terminal";
+const KEYCHAIN_ACCOUNT = "encryption-key";
 
 function legacyMachineKey(): Buffer {
   const seed = `${os.hostname()}:${os.homedir()}:${process.getuid?.() ?? 0}`;
   return crypto.pbkdf2Sync(seed, AUTH_SALT, 100_000, 32, "sha512");
 }
 
+function readKeychainKey(): Buffer | null {
+  try {
+    const platform = os.platform();
+    if (platform === "darwin") {
+      const out = execFileSync(
+        "security",
+        ["find-generic-password", "-a", KEYCHAIN_ACCOUNT, "-s", KEYCHAIN_SERVICE, "-w"],
+        { stdio: ["ignore", "pipe", "ignore"] },
+      );
+      const hex = out.toString().trim();
+      return hex ? Buffer.from(hex, "hex") : null;
+    }
+    if (platform === "linux") {
+      const out = execFileSync(
+        "secret-tool",
+        ["lookup", "service", KEYCHAIN_SERVICE, "account", KEYCHAIN_ACCOUNT],
+        { stdio: ["ignore", "pipe", "ignore"] },
+      );
+      const hex = out.toString().trim();
+      return hex ? Buffer.from(hex, "hex") : null;
+    }
+    if (platform === "win32") {
+      // Windows Credential Manager via PowerShell.
+      const cmd = `[System.Text.Encoding]::UTF8.GetString((Get-StoredCredential -Target '${KEYCHAIN_SERVICE}\\${KEYCHAIN_ACCOUNT}').Password)`;
+      const out = execFileSync("powershell", ["-NoProfile", "-Command", cmd], {
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      const hex = out.toString().trim();
+      return hex ? Buffer.from(hex, "hex") : null;
+    }
+  } catch {
+    // Keychain absent / not authorised — fall back below.
+  }
+  return null;
+}
+
+let cachedKey: Buffer | null = null;
+
+function getEncryptionKey(): Buffer {
+  if (cachedKey) return cachedKey;
+  const fromChain = readKeychainKey();
+  cachedKey = fromChain ?? legacyMachineKey();
+  return cachedKey;
+}
+
 function decryptAuth(packed: string): string | null {
   try {
     const [ivHex, tagHex, dataHex] = packed.split(":");
-    const decipher = crypto.createDecipheriv(AUTH_ALGO, legacyMachineKey(), Buffer.from(ivHex, "hex"));
+    const decipher = crypto.createDecipheriv(
+      AUTH_ALGO,
+      getEncryptionKey(),
+      Buffer.from(ivHex, "hex"),
+    );
     decipher.setAuthTag(Buffer.from(tagHex, "hex"));
-    return Buffer.concat([decipher.update(Buffer.from(dataHex, "hex")), decipher.final()]).toString("utf-8");
+    return Buffer.concat([
+      decipher.update(Buffer.from(dataHex, "hex")),
+      decipher.final(),
+    ]).toString("utf-8");
   } catch {
     return null;
   }
