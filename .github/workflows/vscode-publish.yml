@@ -3,13 +3,13 @@ name: Publish VS Code Extension
 on:
   push:
     tags:
-      - 'vscode-v*'
+      - "vscode-v*"
   workflow_dispatch:
     inputs:
       version_bump:
-        description: 'Version bump type'
+        description: "Version bump type"
         required: true
-        default: 'patch'
+        default: "patch"
         type: choice
         options:
           - patch
@@ -23,52 +23,85 @@ jobs:
       run:
         working-directory: packages/vscode
 
+    permissions:
+      contents: write  # required to attach the .vsix to a GitHub Release
+
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
+          bun-version: latest
 
-      # Build core dependency first
-      - name: Install & build core
-        run: |
-          cd ../core
-          npm install
-          npx tsc -p .
+      - name: Install monorepo dependencies
+        working-directory: .
+        run: bun install --frozen-lockfile
 
-      - name: Install dependencies
-        run: npm install
+      # Core is a workspace package — its dist is consumed by the extension.
+      - name: Build core
+        working-directory: packages/core
+        run: bun run build
 
-      - name: Compile TypeScript
-        run: npm run build
+      - name: Typecheck extension
+        run: bun run typecheck
 
-      - name: Run tests
-        run: node --test dist/test/suite.test.js
+      - name: Build extension (esbuild bundle)
+        run: bun run build
 
-      - name: Install vsce
-        run: npm install -g @vscode/vsce
-
-      # Tag-based publish
-      - name: Package & publish (tag)
+      # ── Tag-based publish ─────────────────────────────────────
+      - name: Package & publish to marketplace (tag)
         if: startsWith(github.ref, 'refs/tags/vscode-v')
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
-          vsce package
-          vsce publish -p $VSCE_PAT
+          bun x vsce package --no-dependencies --out wabisabi-ai.vsix
+          if [ -n "$VSCE_PAT" ]; then
+            bun x vsce publish --no-dependencies -p "$VSCE_PAT"
+          else
+            echo "VSCE_PAT not set — skipping marketplace publish (will only attach .vsix to release)"
+          fi
 
-      # Manual dispatch publish with version bump
+      # ── Manual dispatch publish with version bump ─────────────
       - name: Package & publish (manual)
         if: github.event_name == 'workflow_dispatch'
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
-          vsce publish ${{ inputs.version_bump }} -p $VSCE_PAT
+          if [ -z "$VSCE_PAT" ]; then
+            echo "VSCE_PAT not set — refusing to publish on manual dispatch"
+            exit 1
+          fi
+          bun x vsce publish ${{ inputs.version_bump }} --no-dependencies -p "$VSCE_PAT"
+          bun x vsce package --no-dependencies --out wabisabi-ai.vsix
 
-      - name: Upload VSIX artifact
+      # ── Upload .vsix everywhere we can ────────────────────────
+      - name: Upload VSIX as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wabisabi-vscode
-          path: packages/vscode/*.vsix
-          retention-days: 30
+          name: wabisabi-ai-vsix
+          path: packages/vscode/wabisabi-ai.vsix
+          retention-days: 90
+
+      # The release asset lets users install via a direct URL even when the
+      # marketplace publish is skipped (no VSCE_PAT) or rate-limited.
+      - name: Attach VSIX to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/vscode-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packages/vscode/wabisabi-ai.vsix
+          name: VS Code Extension ${{ github.ref_name }}
+          body: |
+            WabiSabi VS Code extension build for `${{ github.ref_name }}`.
+
+            **Install from the marketplace:**
+            ```bash
+            code --install-extension wabisabi.wabisabi-ai
+            ```
+
+            **Install from this release (sideload):**
+            1. Download `wabisabi-ai.vsix` below.
+            2. Open VS Code → Extensions panel → `...` menu → Install from VSIX.
+            3. Pick the downloaded file.
+          draft: false
+          prerelease: false

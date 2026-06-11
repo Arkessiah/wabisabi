@@ -79,6 +79,40 @@ jobs:
             packages/plugins/dist/
           retention-days: 7
 
+  vscode:
+    name: VS Code Extension (typecheck + build + package)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: packages/vscode
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install monorepo dependencies
+        working-directory: .
+        run: bun install --frozen-lockfile
+      - name: Build core
+        working-directory: packages/core
+        run: bun run build
+      - name: Typecheck extension
+        run: bun run typecheck
+      - name: Build extension (esbuild bundle)
+        run: bun run build
+      - name: Package .vsix (smoke test)
+        run: |
+          bun add -d @vscode/vsce@latest --silent
+          bun x vsce package --no-dependencies --out wabisabi-ai.vsix
+          ls -lh wabisabi-ai.vsix
+      - name: Upload .vsix preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wabisabi-ai-vsix-preview
+          path: packages/vscode/wabisabi-ai.vsix
+          retention-days: 14
+
   test-matrix:
     name: Test on Multiple Platforms
     runs-on: ${{ matrix.os }}
