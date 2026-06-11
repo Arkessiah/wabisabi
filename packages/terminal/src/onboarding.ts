@@ -126,6 +126,12 @@ async function setupAccount(locale: string): Promise<boolean> {
     t(locale, "Como quieres conectarte?", "How do you want to connect?"),
     [
       {
+        value: "password",
+        label: t(locale,
+          "Iniciar sesion con email + contrasena (sin navegador)",
+          "Sign in with email + password (no browser)"),
+      },
+      {
         value: "register",
         label: t(locale,
           "Crear cuenta nueva (abre navegador)",
@@ -145,6 +151,10 @@ async function setupAccount(locale: string): Promise<boolean> {
       },
     ],
   );
+
+  if (accountAction === "password") {
+    return await loginWithPassword(locale);
+  }
 
   if (accountAction === "register") {
     console.log("");
@@ -201,6 +211,109 @@ async function setupAccount(locale: string): Promise<boolean> {
   }
 
   return false;
+}
+
+/**
+ * Direct email+password login against the Substratum terminal endpoint.
+ * No browser, no copy-pasting tokens — issues a JWT and writes it to
+ * ~/.wabisabi/auth.json via the AuthManager. The provider is set to
+ * substratum so the rest of the stack picks up the bearer token.
+ */
+async function loginWithPassword(locale: string): Promise<boolean> {
+  const { authManager } = await import("./auth/index.js");
+
+  // Allow override via env so the user can target their local stack without
+  // editing config first. Falls back to the public Substratum API.
+  const substratumUrl =
+    process.env.SUBSTRATUM_URL ||
+    configManager.getProviders().substratum.url ||
+    SUBSTRATUM_URL;
+
+  console.log("");
+  console.log(chalk.dim(t(locale,
+    `  Conectando a: ${substratumUrl}`,
+    `  Connecting to: ${substratumUrl}`)));
+  console.log("");
+
+  // Make sure the AuthManager points at the same URL.
+  const providers = configManager.getProviders();
+  providers.substratum.url = substratumUrl;
+  providers.substratum.enabled = true;
+  configManager.update("providers", providers, "global");
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const email = await askInput(t(locale, "Email", "Email"));
+    if (!email || !email.includes("@")) {
+      console.log(chalk.yellow(t(locale,
+        "  Email no valido.",
+        "  Invalid email.")));
+      continue;
+    }
+
+    const password = await askPassword(t(locale, "Contrasena", "Password"));
+    if (!password) {
+      console.log(chalk.yellow(t(locale,
+        "  Contrasena vacia.",
+        "  Empty password.")));
+      continue;
+    }
+
+    console.log(chalk.dim(t(locale, "  Autenticando...", "  Authenticating...")));
+    const ok = await authManager.loginTerminal(email.trim(), password);
+
+    if (ok) {
+      console.log(chalk.green(t(locale,
+        "  + Sesion iniciada",
+        "  + Logged in")));
+      return true;
+    }
+
+    console.log(chalk.red(t(locale,
+      "  Credenciales no validas. Reintenta o crea cuenta en el navegador.",
+      "  Invalid credentials. Try again or create an account in the browser.")));
+
+    const retry = await askConfirm(
+      t(locale, "Reintentar?", "Retry?"),
+      attempt < 2,
+    );
+    if (!retry) return false;
+  }
+  return false;
+}
+
+/**
+ * Hidden-input password prompt — the standard readline implementation echoes
+ * characters. We toggle raw mode and consume keystrokes manually.
+ */
+async function askPassword(label: string): Promise<string> {
+  return new Promise((resolve) => {
+    process.stdout.write(`${label}: `);
+    let pw = "";
+    process.stdin.setRawMode?.(true);
+    process.stdin.resume();
+    process.stdin.setEncoding("utf8");
+    const onData = (ch: string) => {
+      const c = ch.toString();
+      if (c === "\n" || c === "\r") {
+        process.stdin.setRawMode?.(false);
+        process.stdin.pause();
+        process.stdin.off("data", onData);
+        process.stdout.write("\n");
+        resolve(pw);
+      } else if (c === "\x7f" || c === "\b") {
+        if (pw.length > 0) pw = pw.slice(0, -1);
+      } else if (c === "\x03") {
+        process.stdin.setRawMode?.(false);
+        process.stdin.pause();
+        process.stdin.off("data", onData);
+        process.stdout.write("\n");
+        process.exit(0);
+      } else {
+        pw += c;
+      }
+    };
+    process.stdin.on("data", onData);
+  });
 }
 
 async function requestAndSaveToken(locale: string): Promise<boolean> {

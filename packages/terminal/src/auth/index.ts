@@ -232,7 +232,11 @@ export class AuthManager {
 
   /**
    * Login via Substratum terminal endpoint (email/password).
-   * POST /terminal/auth/login → { token, sessionId, expiresIn }
+   * POST /terminal/auth/login → { token, refreshToken?, sessionId, expiresIn, user? }
+   *
+   * The substratum backend bridges this endpoint to its canonical
+   * user-management.authenticateUser so a dashboard-registered user can log in
+   * through the CLI with the same credentials.
    */
   async loginTerminal(email: string, password: string): Promise<boolean> {
     const baseUrl = this.getSubstratumUrl();
@@ -240,20 +244,34 @@ export class AuthManager {
       const res = await fetch(`${baseUrl}/terminal/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: email, password, cliVersion: "1.0.0" }),
+        body: JSON.stringify({ email, password, cliVersion: "1.0.0" }),
       });
       if (!res.ok) return false;
       const data = (await res.json()) as Record<string, unknown>;
       if (typeof data.token !== "string") return false;
 
       const payload = decodeJwt(data.token);
+      // Prefer the user object the backend returns; fall back to JWT sub.
+      const userObj = (data.user ?? {}) as Record<string, unknown>;
+      const resolvedUserId =
+        typeof userObj.id === "string"
+          ? userObj.id
+          : typeof payload?.sub === "string"
+            ? payload.sub
+            : undefined;
+      const resolvedEmail =
+        typeof userObj.email === "string" ? userObj.email : email;
+
       this.config = {
         provider: "substratum",
         accessToken: data.token,
-        sessionId: typeof data.sessionId === "string" ? data.sessionId : undefined,
+        refreshToken:
+          typeof data.refreshToken === "string" ? data.refreshToken : undefined,
+        sessionId:
+          typeof data.sessionId === "string" ? data.sessionId : undefined,
         expiresAt: payload?.exp,
-        userId: typeof payload?.sub === "string" ? payload.sub : undefined,
-        email,
+        userId: resolvedUserId,
+        email: resolvedEmail,
       };
       this.save();
       return true;
@@ -278,24 +296,46 @@ export class AuthManager {
 
   private async refreshToken(): Promise<void> {
     if (!this.config?.refreshToken) return;
-    const endpoint =
-      this.config.provider === "github"
-        ? "https://github.com/login/oauth/access_token"
-        : `${this.getSubstratumUrl()}/auth/refresh`;
+
+    // GitHub still speaks OAuth snake_case; the Substratum gateway uses
+    // camelCase ({ refreshToken } in, { accessToken, refreshToken } out).
+    const isGithub = this.config.provider === "github";
+    const endpoint = isGithub
+      ? "https://github.com/login/oauth/access_token"
+      : `${this.getSubstratumUrl()}/auth/refresh`;
+
+    const body = isGithub
+      ? JSON.stringify({
+          grant_type: "refresh_token",
+          refresh_token: this.config.refreshToken,
+        })
+      : JSON.stringify({ refreshToken: this.config.refreshToken });
 
     try {
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ grant_type: "refresh_token", refresh_token: this.config.refreshToken }),
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body,
       });
       if (!res.ok) return;
       const data = (await res.json()) as Record<string, unknown>;
-      if (typeof data.access_token === "string") {
-        this.config.accessToken = data.access_token;
-        if (typeof data.refresh_token === "string") {
-          this.config.refreshToken = data.refresh_token;
-        }
+
+      // Accept both camelCase (Substratum) and snake_case (OAuth/GitHub).
+      const access =
+        (typeof data.accessToken === "string" && data.accessToken) ||
+        (typeof data.access_token === "string" && data.access_token) ||
+        null;
+      const refresh =
+        (typeof data.refreshToken === "string" && data.refreshToken) ||
+        (typeof data.refresh_token === "string" && data.refresh_token) ||
+        null;
+
+      if (access) {
+        this.config.accessToken = access;
+        if (refresh) this.config.refreshToken = refresh;
         const payload = decodeJwt(this.config.accessToken);
         if (payload?.exp) this.config.expiresAt = payload.exp;
         this.save();
