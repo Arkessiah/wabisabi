@@ -691,4 +691,143 @@ export class ApiClient {
 
     return models.length > 0 ? [...new Set(models)] : [this.model];
   }
+
+  // ── Substratum v1 surfaces (soul / karma / agents) ─────────────
+  //
+  // These hit the Substratum gateway's PG-persisted services. The CLI agents
+  // (BUILD / PLAN / SEARCH) run LOCALLY against the configured LLM provider;
+  // these endpoints exist so the CLI can show karma stats, persist memories
+  // across devices, and discover the server-defined agent personas if/when a
+  // remote-execution flow lands. Each method swallows non-2xx as null so
+  // calling code can treat "Substratum unavailable" as "no data".
+
+  private async substratumFetch<T>(
+    pathSuffix: string,
+    init: RequestInit & { signalTimeoutMs?: number } = {},
+  ): Promise<T | null> {
+    try {
+      const headers = await this.getHeaders();
+      const controller = new AbortController();
+      const timer = setTimeout(
+        () => controller.abort(),
+        init.signalTimeoutMs ?? 5000,
+      );
+      const res = await fetch(`${this.substratumUrl}${pathSuffix}`, {
+        ...init,
+        headers: { ...headers, ...(init.headers as any) },
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      return (await res.json()) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Soul: list this user's memories (most recent first). */
+  async soulList(
+    limit = 100,
+  ): Promise<{ memories: any[]; count: number } | null> {
+    return this.substratumFetch(`/v1/soul?limit=${limit}`);
+  }
+
+  /** Soul: persist a memory. */
+  async soulRemember(input: {
+    content: string;
+    type?: string;
+    importance?: number;
+    tags?: string[];
+    metadata?: Record<string, unknown>;
+    sessionId?: string;
+    expiresAt?: string;
+  }): Promise<{ memoryId: string } | null> {
+    return this.substratumFetch(`/v1/soul/remember`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+  }
+
+  /** Soul: full-text + tag search within this user's memories. */
+  async soulSearch(
+    query: string,
+    limit = 10,
+  ): Promise<{ results: any[]; count: number } | null> {
+    const qs = new URLSearchParams({ q: query, limit: String(limit) });
+    return this.substratumFetch(`/v1/soul/search?${qs}`);
+  }
+
+  /** Soul: delete a memory by id (only the owner can). */
+  async soulDelete(memoryId: string): Promise<{ success: boolean } | null> {
+    return this.substratumFetch(`/v1/soul/${encodeURIComponent(memoryId)}`, {
+      method: "DELETE",
+    });
+  }
+
+  /** Karma: current user's score. Auto-initializes the row on first call. */
+  async karmaGet(): Promise<any | null> {
+    return this.substratumFetch(`/v1/karma`);
+  }
+
+  /** Karma: award points to self (or to another user if caller is admin/root). */
+  async karmaAdd(input: {
+    action: string;
+    description?: string;
+    metadata?: Record<string, unknown>;
+    targetUserId?: string;
+  }): Promise<any | null> {
+    return this.substratumFetch(`/v1/karma/add`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+  }
+
+  /** Karma: recent contribution history for the caller. */
+  async karmaHistory(
+    limit = 50,
+  ): Promise<{ history: any[]; count: number } | null> {
+    return this.substratumFetch(`/v1/karma/history?limit=${limit}`);
+  }
+
+  /** Karma: top-N by score. */
+  async karmaLeaderboard(
+    limit = 10,
+  ): Promise<{ topUsers: any[]; count: number } | null> {
+    return this.substratumFetch(`/v1/karma/leaderboard?limit=${limit}`);
+  }
+
+  /** Agents: list the server-defined personas (build / plan / search). */
+  async agentsList(): Promise<{ agents: any[]; count: number } | null> {
+    return this.substratumFetch(`/v1/agents`);
+  }
+
+  /**
+   * Agents: dispatch a task to a server-defined persona. Returns the
+   * orchestrator's response inline. The CLI's local agents remain the primary
+   * surface — this method is here for cases where you want to delegate a task
+   * to the cluster without paying the local round-trip (CI, batch, mobile).
+   */
+  async agentRun(
+    agentId: string,
+    payload: { task: string; context?: string; model?: string; max_tokens?: number; temperature?: number },
+  ): Promise<{
+    success: boolean;
+    sessionId: string;
+    agentId: string;
+    result: string;
+    finishReason: string;
+    usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  } | null> {
+    return this.substratumFetch(
+      `/v1/agents/${encodeURIComponent(agentId)}/run`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signalTimeoutMs: 60_000,
+      },
+    );
+  }
 }
