@@ -1,3 +1,6 @@
+# linearpm routing (privado, no versionar)
+.linearpm.json
+
 # Logs
 logs
 *.log
