@@ -147,7 +147,9 @@ Gestión: `wabisabi plugin --list | --install <path> | --enable <name> | --disab
 - **Auth**: OAuth device-code + JWT + almacenamiento cifrado AES-256-GCM
 - **Base de datos**: adapters File/SQLite/Memory con cache TTL
 - **Retry**: exponential backoff (3 reintentos, timeout 120 s)
-- **Tests**: `bun:test` — **30 ficheros, 369 casos** (verificado 2026-08-11)
+- **Tests**: `bun:test` — **301 tests en 30 ficheros** (`bun test`, verificado 2026-08-11).
+  3 fallan desde antes de esta documentación: falta el paquete `beautiful-mermaid` que importa
+  `packages/terminal/src/rendering/index.ts`.
 - **Web**: `Bun.serve` + xterm.js (puente WebSocket)
 
 ## Superficies
