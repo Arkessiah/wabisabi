@@ -152,6 +152,16 @@ BASE/
 !SECURITY.md
 !.github/*.md
 !DOC/**/*.md
+# Project skills are the portable source of truth and DO ship with the repo
+!.agents/**/*.md
+# Module-owned documentation ships with the module it documents
+!**/DOCUMENTATION.md
+
+# Backups (regla BCK: nunca al repo)
+BCK/
+
+# Skills compat layer: generated views of .agents/skills for other agent runtimes
+.opencode/skills/
 
 # Private planning and infrastructure docs (never commit)
 PRODUCTION_ROADMAP.md
