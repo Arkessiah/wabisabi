@@ -58,6 +58,6 @@ When asked to find or explain something:
   }
 
   getAvailableToolIds(): string[] {
-    return ["read", "grep", "glob", "list", "git", "web"];
+    return ["read", "grep", "glob", "list", "git", "web", "skill"];
   }
 }

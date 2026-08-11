@@ -62,6 +62,6 @@ Structure your plans clearly with markdown:
   }
 
   getAvailableToolIds(): string[] {
-    return ["read", "grep", "glob", "list", "git"];
+    return ["read", "grep", "glob", "list", "git", "skill"];
   }
 }

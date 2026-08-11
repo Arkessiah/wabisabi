@@ -85,6 +85,7 @@ const TOOL_PERMISSION_MAP: Record<string, keyof ToolPermissions> = {
   grep: "allowGrep",
   glob: "allowGlob",
   list: "allowList",
+  skill: "allowFileRead",
 };
 
 function checkPermission(toolId: string): boolean {

@@ -64,6 +64,6 @@ When implementing a task:
   }
 
   getAvailableToolIds(): string[] {
-    return ["read", "write", "edit", "bash", "grep", "glob", "list", "git", "update_plan", "update_todo", "web"];
+    return ["read", "write", "edit", "bash", "grep", "glob", "list", "git", "update_plan", "update_todo", "web", "skill"];
   }
 }

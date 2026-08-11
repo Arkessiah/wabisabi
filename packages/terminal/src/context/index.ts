@@ -11,6 +11,7 @@ import { StackDetector, type ProjectStack } from "./detector.js";
 import { AgentsMdManager } from "./agents-md.js";
 import { PlanMdManager } from "./plan-md.js";
 import { TodoMdManager } from "./todo-md.js";
+import { SkillsManager } from "./skills.js";
 import { configManager } from "../config/index.js";
 
 const PROJECT_MARKERS = [
@@ -33,6 +34,7 @@ export class ProjectContext {
   private agentsMd: AgentsMdManager | null = null;
   private planMd: PlanMdManager | null = null;
   private todoMd: TodoMdManager | null = null;
+  private skills: SkillsManager | null = null;
   private initialized = false;
 
   detectProjectRoot(startDir?: string): string {
@@ -73,6 +75,7 @@ export class ProjectContext {
     this.agentsMd = new AgentsMdManager(this.projectRoot);
     this.planMd = new PlanMdManager(this.projectRoot);
     this.todoMd = new TodoMdManager(this.projectRoot);
+    this.skills = new SkillsManager(this.projectRoot);
 
     // 5. Create MD files if they don't exist
     try {
@@ -126,7 +129,17 @@ export class ProjectContext {
       );
     }
 
+    // Skills index: one compact line per skill. Empty when the project has none.
+    if (this.skills) {
+      const index = this.skills.buildSkillsIndex();
+      if (index) parts.push(index);
+    }
+
     return parts.join("\n");
+  }
+
+  getSkills(): SkillsManager | null {
+    return this.skills;
   }
 
   getProjectRoot(): string {

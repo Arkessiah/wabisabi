@@ -27,6 +27,7 @@ import { updatePlanTool } from "./tools/update-plan.js";
 import { updateTodoTool } from "./tools/update-todo.js";
 import { gitTool } from "./tools/git.js";
 import { webTool } from "./tools/web.js";
+import { skillTool } from "./tools/skill.js";
 
 toolRegistry.register(readTool);
 toolRegistry.register(writeTool);
@@ -39,6 +40,7 @@ toolRegistry.register(updatePlanTool);
 toolRegistry.register(updateTodoTool);
 toolRegistry.register(gitTool);
 toolRegistry.register(webTool);
+toolRegistry.register(skillTool);
 
 // Load global config
 configManager.loadGlobal();

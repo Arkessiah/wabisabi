@@ -1,6 +1,7 @@
 ---
 name: cli-tui-patterns
 description: Use when changing WabiSabi CLI commands, execution modes, the interactive REPL/TUI, terminal rendering, slash commands, non-interactive output, or process exit codes.
+triggers: cli, comando, comandos, command, slash, repl, tui, terminal, modo, modos, mode, rendering, render, salida, output, tty, exit
 ---
 
 # Patrones de CLI y TUI

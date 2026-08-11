@@ -1,6 +1,7 @@
 ---
 name: auth-shared-session
 description: Use when changing WabiSabi authentication, the auth.json format or its encryption, keychain access, OAuth device-code flow, JWT refresh, or anything affecting the shared session between the CLI and the VS Code extension.
+triggers: auth, autenticacion, authentication, login, token, jwt, keychain, cifrado, encryption, credencial, credenciales, sesion, session, oauth
 ---
 
 # Auth y sesión compartida CLI ↔ VS Code

@@ -1,6 +1,7 @@
 ---
 name: wabisabi-change-discipline
 description: Use when implementing, fixing, refactoring or otherwise modifying WabiSabi source code, dependencies, exports, build configuration, package contracts or module ownership.
+triggers: refactor, refactorizar, dependencia, dependencias, dependency, export, exports, build, contrato, contract, modulo, module, migracion, migration
 ---
 
 # WabiSabi Change Discipline

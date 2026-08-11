@@ -1,6 +1,7 @@
 ---
 name: provider-routing
 description: Use when changing WabiSabi provider clients, model routing, provider strategies, fallback behavior, SSE streaming, Substratum/Ollama endpoints, or the Ollama cluster.
+triggers: provider, proveedor, routing, enrutado, modelo, model, fallback, streaming, sse, ollama, substratum, cluster, estrategia, strategy
 ---
 
 # Routing de modelos y clientes de proveedor

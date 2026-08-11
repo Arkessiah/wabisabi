@@ -86,6 +86,9 @@ export abstract class BaseAgent {
     this.io = io || new LegacyTerminalIO();
   }
 
+  /** Last auto-loaded skill block, to avoid re-injecting it every turn. */
+  private lastAutoLoadedSkill = "";
+
   abstract getSystemPrompt(): string;
   abstract getAvailableToolIds(): string[];
   abstract getHeader(): string;
@@ -143,6 +146,7 @@ export abstract class BaseAgent {
             "  /model <name>     Change model\n" +
             "  /status           Show current status\n" +
             "  /tools            List available tools\n" +
+            "  /skills           List project skills\n" +
             "  /approve          Toggle auto-approve for tools\n" +
             "  /compact          Smart compact conversation history\n" +
             "  /export [file]    Export conversation to markdown\n" +
@@ -223,6 +227,27 @@ export abstract class BaseAgent {
           if (tool) {
             output += `  ${chalk.cyan(id.padEnd(10))} ${chalk.dim(tool.description.slice(0, 60))}\n`;
           }
+        }
+        this.io.writeOutput(output);
+        return true;
+      }
+
+      case "skills": {
+        const mgr = projectContext.getSkills();
+        const skills = mgr?.list() ?? [];
+        if (skills.length === 0) {
+          this.io.writeOutput(
+            chalk.dim("\n  Sin skills. Crea .agents/skills/<nombre>/SKILL.md\n"),
+          );
+          return true;
+        }
+        let output = chalk.bold("\n  Project Skills\n");
+        for (const s of skills) {
+          const scope = s.scope === "project" ? "proyecto" : "usuario";
+          output += `  ${chalk.cyan(s.name.padEnd(28))} ${chalk.dim(`[${scope}] ` + s.description.slice(0, 50))}\n`;
+        }
+        for (const w of mgr?.getWarnings() ?? []) {
+          output += chalk.yellow(`  ! ${w}\n`);
         }
         this.io.writeOutput(output);
         return true;
@@ -1316,6 +1341,15 @@ export abstract class BaseAgent {
               continue;
             }
           }
+        }
+
+        // Deterministic skill auto-load: inject the matching project skill as a
+        // system message BEFORE the user turn, so small local models get the
+        // procedure without having to call the `skill` tool themselves.
+        const skillContext = projectContext.getSkills()?.buildAutoLoadContext(trimmed) ?? "";
+        if (skillContext && skillContext !== this.lastAutoLoadedSkill) {
+          this.conversationHistory.push({ role: "system", content: skillContext });
+          this.lastAutoLoadedSkill = skillContext;
         }
 
         // Add user message

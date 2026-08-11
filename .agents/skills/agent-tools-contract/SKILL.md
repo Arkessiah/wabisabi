@@ -1,6 +1,7 @@
 ---
 name: agent-tools-contract
 description: Use when adding or modifying WabiSabi agent tools, their parameters, the tool registry, permission mapping, destructive-operation confirmation, or tool output handling.
+triggers: tool, tools, herramienta, herramientas, permiso, permisos, permission, registry, registro, destructivo, destructive, allowbash, allowfilewrite
 ---
 
 # Contrato de tools del agente
@@ -20,11 +21,11 @@ la estás sacando del contrato.
 
 ## Añadir una tool
 
-1. Crea `packages/terminal/src/tools/<nombre>.ts` con `defineTool({ id, description, parameters, execute })`.
+1. Crea `packages/terminal/src/tools/<nombre>.ts` con `defineTool("<id>", { description, parameters, execute })` — el id es el **primer argumento**, no una clave del objeto.
 2. `parameters` es un esquema **Zod**; se convierte solo a JSON Schema para el spec OpenAI.
 3. Si toca disco, red o procesos, **añade su id a `TOOL_PERMISSION_MAP`**. Mapa actual:
    `read→allowFileRead`, `write|edit→allowFileWrite`, `bash→allowBash`,
-   `grep→allowGrep`, `glob→allowGlob`, `list→allowList`.
+   `grep→allowGrep`, `glob→allowGlob`, `list→allowList`, `skill→allowFileRead`.
    **`checkPermission` devuelve `true` para cualquier id que no esté en el mapa**: sin entrada,
    la tool corre sin puerta. Hoy quedan fuera `git`, `web`, `update_plan` y `update_todo`
    (ver el hueco documentado en `tools/DOCUMENTATION.md`).
