@@ -53,7 +53,7 @@ opcional es una violación de proceso.
 |---|---|
 | Fuente, dependencias, exports, build, contratos de paquete, propiedad de módulo | `wabisabi-change-discipline` |
 | Tools, permisos, confirmación de destructivos, registro de tools | `agent-tools-contract` |
-| Clientes de proveedor, routing de modelos, estrategias, fallback, SSE, Ollama | `provider-routing` |
+| Proveedores, routing, estrategias, fallback, SSE, Ollama, cortex | `provider-routing` |
 | `auth.json`, cifrado, keychain, OAuth, JWT, sesión compartida CLI↔VS Code | `auth-shared-session` |
 | Modos, REPL/TUI, rendering, slash commands, salida no interactiva, exit codes | `cli-tui-patterns` |
 
@@ -63,7 +63,7 @@ Claude Code / OpenCode: `bash scripts/sync-skills.sh`.
 ## Documentación
 
 Lee el `DOCUMENTATION.md` más cercano bajo `packages/**` antes de tocar un módulo (anclas:
-`tools/`, `routing/`, `auth/src/`). Producto: `DOC/ES/`, **fuente de verdad**; `DOC/EN/` solo a
+`tools/`, `routing/`, `auth/src/`, `cortex/`). Producto: `DOC/ES/`, **fuente de verdad**; `DOC/EN/` solo a
 petición. Ningún `.md` nuevo se commitea sin aprobación, salvo `README.md`.
 
 ## Validación

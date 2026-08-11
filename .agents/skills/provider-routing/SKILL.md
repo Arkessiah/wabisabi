@@ -1,7 +1,7 @@
 ---
 name: provider-routing
 description: Use when changing WabiSabi provider clients, model routing, provider strategies, fallback behavior, SSE streaming, Substratum/Ollama endpoints, or the Ollama cluster.
-triggers: provider, proveedor, routing, enrutado, modelo, model, fallback, streaming, sse, ollama, substratum, cluster, estrategia, strategy
+triggers: provider, proveedor, routing, enrutado, modelo, model, fallback, streaming, sse, ollama, substratum, cluster, estrategia, strategy, cortex
 ---
 
 # Routing de modelos y clientes de proveedor
@@ -12,6 +12,10 @@ triggers: provider, proveedor, routing, enrutado, modelo, model, fallback, strea
 - `packages/terminal/src/clients/api-client.ts` — cliente OpenAI-compatible con SSE.
 - `packages/terminal/src/clients/ollama-cluster.ts` — cluster de nodos Ollama.
 - `packages/terminal/src/config/schema.ts` — esquema de proveedores y estrategia.
+- `packages/terminal/src/cortex/` — el **modelo pequeño** local (tareas auxiliares).
+  Lee `cortex/DOCUMENTATION.md`: su `CortexResult` distingue `unavailable` / `timeout` /
+  `empty-output` / `invalid-output`, y **no** se debe colapsar a `null` en llamantes que actuen
+  sobre la respuesta.
 
 ## Orden de resolución (no lo alteres sin pedirlo)
 
