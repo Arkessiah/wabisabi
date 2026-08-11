@@ -679,6 +679,9 @@ export abstract class BaseAgent {
             `  Summarized: ${stats.summarized}\n` +
             `  Compacted:  ${stats.compacted}\n` +
             `  Fallbacks:  ${stats.fallbacks}\n` +
+            (cortexEngine.lastError
+              ? `  Last error: ${chalk.yellow(cortexEngine.lastError)}\n`
+              : "") +
             chalk.dim("  ──────────────────────────────────\n") +
             chalk.bold(`  Tokens saved: ~${stats.tokensSaved.toLocaleString()}\n`),
         );

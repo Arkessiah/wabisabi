@@ -11,7 +11,7 @@
  * Falls back to heuristics when Ollama is unavailable.
  */
 
-import { CortexClient } from "./client.js";
+import { CortexClient, textOrNull, type CortexFailure } from "./client.js";
 import {
   CortexConfigSchema,
   DEFAULT_STATS,
@@ -124,6 +124,7 @@ export class CortexEngine {
   private config: CortexConfig;
   private stats: CortexStats = { ...DEFAULT_STATS };
   private _available: boolean | null = null; // null = not checked yet
+  private lastFailure: CortexFailure | null = null;
 
   constructor(config?: Partial<CortexConfig>, clusterEndpoint?: string) {
     this.config = CortexConfigSchema.parse(config || {});
@@ -148,6 +149,15 @@ export class CortexEngine {
     return this.config.enabled;
   }
 
+  /**
+   * Why the last model call did not produce usable text, or null when the last
+   * call worked. Diagnostic only: the degradation path stays the same, but now
+   * "Ollama esta caido" is distinguishable from "el modelo no dijo nada".
+   */
+  get lastError(): CortexFailure | null {
+    return this.lastFailure;
+  }
+
   get isAvailable(): boolean {
     return this._available === true;
   }
@@ -167,7 +177,9 @@ export class CortexEngine {
     }
 
     const prompt = classifyPrompt(message);
-    const result = await this.client.generateJSON<ClassifyResult>(prompt);
+    const res = await this.client.generateJSON<ClassifyResult>(prompt);
+    if (!res.ok) this.lastFailure = res.failure;
+    const result = res.ok ? res.value : null;
 
     if (result && result.complexity && result.category) {
       // Validate fields
@@ -197,7 +209,9 @@ export class CortexEngine {
     }
 
     const prompt = answerPrompt(message, context);
-    const response = await this.client.generate(prompt, { maxTokens: 128 });
+    const res = await this.client.generate(prompt, { maxTokens: 128 });
+    if (!res.ok) this.lastFailure = res.failure;
+    const response = textOrNull(res);
 
     if (!response || response === "CANNOT_ANSWER" || response.includes("CANNOT_ANSWER")) {
       return null;
@@ -220,7 +234,9 @@ export class CortexEngine {
     }
 
     const prompt = summarizePrompt(toolName, output, maxChars);
-    const response = await this.client.generate(prompt, { maxTokens: 256 });
+    const res = await this.client.generate(prompt, { maxTokens: 256 });
+    if (!res.ok) this.lastFailure = res.failure;
+    const response = textOrNull(res);
 
     if (response && response.length > 10) {
       this.stats.summarized++;
@@ -249,7 +265,9 @@ export class CortexEngine {
       return messages;
     }
 
-    const response = await this.client.generate(prompt, { maxTokens: 512 });
+    const res = await this.client.generate(prompt, { maxTokens: 512 });
+    if (!res.ok) this.lastFailure = res.failure;
+    const response = textOrNull(res);
 
     if (response && response.length > 30) {
       const system = messages[0];
