@@ -45,6 +45,7 @@ wabisabi shortcuts                  # Atajos de teclado
 /model <name>     Cambiar modelo (persiste)
 /status           Estado completo (tokens, contexto, perfil)
 /tools            Listar herramientas disponibles
+/skills           Listar skills del proyecto (y avisos de las malformadas)
 /approve          Toggle auto-approve para tools destructivos
 /compact          Compactar historial de conversación
 /export [file]    Exportar conversación a markdown
@@ -88,6 +89,7 @@ Hay tab completion para todos los slash commands.
 | `web` | url, prompt? | Fetch y procesado de contenido web |
 | `update_plan` | content | Actualizar `PLAN.md` |
 | `update_todo` | action, task, priority? | Gestionar `TODO.md` |
+| `skill` | name | Cargar entera una skill de `.agents/skills/` |
 
 Registro real en `packages/terminal/src/index.ts`. Contrato e invariantes en
 `packages/terminal/src/tools/DOCUMENTATION.md`.
@@ -96,7 +98,7 @@ Registro real en `packages/terminal/src/index.ts`. Contrato e invariantes en
 
 Los tools respetan la configuración:
 
-- `allowFileRead` → read, grep, glob, list (default: `true`)
+- `allowFileRead` → read, grep, glob, list, skill (default: `true`)
 - `allowFileWrite` → write, edit (default: `false`)
 - `allowBash` → bash (default: `false`)
 

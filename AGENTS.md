@@ -25,20 +25,20 @@ El CLI **escribe** las credenciales y la extensión las **lee**: tocar el format
 ## Constraints siempre-activos
 
 - Commits **sin `Co-Authored-By`**. Mensajes en español, `tipo(scope): descripción`, < 72 chars.
-- **No ejecutar git ni GitHub** salvo petición explícita del usuario.
+- **No ejecutar git ni GitHub** salvo petición explícita.
 - **No añadir dependencias** ni cambiar versiones, features o alcance sin autorización explícita.
 - **Nunca** loguear ni persistir secretos, tokens, JWT ni contenido sensible.
 - **No borrar código que parezca importante** salvo que sea parte explícita de la tarea.
-- Cambios mínimos; preserva los cambios no relacionados del worktree.
+- Cambios mínimos; preserva lo no relacionado del worktree.
 - Actualiza la documentación dueña cuando cambien propiedad, contratos o invariantes.
 
 ## Invariantes de corrección
 
-- Prefiere **estado autoritativo** sobre heurísticas.
+- Prefiere **estado autoritativo** a heurísticas.
 - **Un fetch fallido NUNCA puede pasar por éxito vacío.** No conviertas un error en `[]`/`{}`/`null`
   que el llamante use para limpiar estado.
-- Resultados parciales, rollback, limpieza y datos rancios: comportamiento **explícito**.
-- Una entidad fallida no puede borrar ni bloquear entidades no relacionadas.
+- Resultados parciales, rollback y datos rancios: comportamiento **explícito**.
+- Una entidad fallida no puede borrar ni bloquear a otras no relacionadas.
 - Las diferencias entre CLI y VS Code son **intencionadas y visibles en el código**.
 - Permisos y privacidad son **autoridad de ejecución**: se comprueban en el core antes de actuar,
   no en la UI ni en el prompt.
@@ -57,7 +57,8 @@ opcional es una violación de proceso.
 | `auth.json`, cifrado, keychain, OAuth, JWT, sesión compartida CLI↔VS Code | `auth-shared-session` |
 | Modos, REPL/TUI, rendering, slash commands, salida no interactiva, exit codes | `cli-tui-patterns` |
 
-Instalarlas en Claude Code u OpenCode: `bash scripts/sync-skills.sh`.
+wabisabi las carga solo (índice + auto-carga + tool `skill`; ver `/skills`).
+Claude Code / OpenCode: `bash scripts/sync-skills.sh`.
 
 ## Documentación
 

@@ -9,7 +9,7 @@ el agente puede hacer al sistema pasa por aquí.
 ## Entrypoints y estructura
 
 - `index.ts` — el framework: `defineTool`, `ToolRegistry`, `TOOL_PERMISSION_MAP`,
-  `checkPermission`, `validatePath`, `truncateOutput`, `toToolSpecs`.
+  `checkPermission`, `validatePathWithinProject`, `truncateOutput`, `toToolSpecs`.
 - Una tool por fichero (`read.ts`, `write.ts`, `edit.ts`, `bash.ts`, `grep.ts`, `glob.ts`,
   `list.ts`, `git.ts`, `web.ts`, `update-plan.ts`, `update-todo.ts`).
 - `diff.ts` — helper de renderizado de diffs para `write`/`edit`. **No es una tool** y no se registra.
@@ -46,6 +46,7 @@ como resultado.
 | `list` | `allowList` | — |
 | `write`, `edit` | `allowFileWrite` | `false` |
 | `bash` | `allowBash` | `false` |
+| `skill` | `allowFileRead` | `true` |
 
 `checkPermission` lee la config **mergeada** (global + proyecto) en cada llamada, no cacheada.
 
@@ -66,7 +67,8 @@ que hoy funcionan.
 
 ## Validación de rutas
 
-`validatePath` normaliza y rechaza cualquier ruta que resuelva **fuera del root del proyecto**
+`validatePathWithinProject` normaliza y rechaza cualquier ruta que resuelva **fuera del root del
+proyecto**
 (comprueba que el relativo no empiece por `..` ni sea absoluto). Toda tool que reciba una ruta
 del LLM debe pasar por ella: es la defensa contra path traversal inducido por prompt.
 
