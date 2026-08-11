@@ -827,6 +827,81 @@ program
     }
   });
 
+program
+  .command("daemon [action]")
+  .description("👻 Background process (opt-in): start, stop, status, logs, run")
+  .action(async (action: string = "status") => {
+    const daemon = await import("./daemon/index.js");
+    const { configManager } = await import("./config/index.js");
+    configManager.loadGlobal();
+    const cfg = configManager.getMerged();
+    const daemonCfg = daemon.DaemonConfigSchema.parse(cfg.daemon ?? {});
+
+    switch (action) {
+      // Internal: the body of the detached child. Not for interactive use.
+      case "run":
+        daemon.runDaemon(daemonCfg);
+        return;
+
+      case "start": {
+        if (!daemonCfg.enabled) {
+          console.log("👻 El daemon está desactivado.");
+          console.log("   Actívalo en ~/.wabisabi/config.jsonc:  \"daemon\": { \"enabled\": true }");
+          process.exitCode = 1;
+          return;
+        }
+        const res = await daemon.start(daemonCfg);
+        if (res.started) {
+          console.log(`👻 Daemon arrancado (pid ${res.pid}, 127.0.0.1:${res.port})`);
+          console.log("   Sobrevive al cierre de la terminal. Párala con: wabisabi daemon stop");
+        } else if (res.reason === "already-running") {
+          console.log(`👻 Ya estaba corriendo (pid ${res.pid}, puerto ${res.port})`);
+        } else {
+          console.error(`❌ No arrancó: ${res.detail ?? res.reason}`);
+          process.exitCode = 1;
+        }
+        return;
+      }
+
+      case "stop": {
+        const res = await daemon.stop();
+        if (res.stopped) {
+          console.log(`👻 Daemon parado (pid ${res.pid})`);
+        } else if (res.reason === "not-running") {
+          console.log("👻 No hay ningún daemon corriendo.");
+        } else {
+          console.error(`❌ No se pudo parar (pid ${res.pid}): ${res.detail}`);
+          process.exitCode = 1;
+        }
+        return;
+      }
+
+      case "logs": {
+        console.log(daemon.defaultLogPath());
+        return;
+      }
+
+      case "status":
+      default: {
+        const st = daemon.status();
+        if (!st.running) {
+          console.log("👻 Daemon: parado" + (daemonCfg.enabled ? "" : " (desactivado en config)"));
+          if (st.staleLockCleared) console.log("   (se limpió un lock huérfano de un proceso muerto)");
+          return;
+        }
+        const mins = Math.floor((st.uptimeMs ?? 0) / 60000);
+        console.log("👻 Daemon: corriendo");
+        console.log(`   pid:      ${st.pid}`);
+        console.log(`   endpoint: 127.0.0.1:${st.port}`);
+        console.log(`   version:  ${st.version}`);
+        console.log(`   uptime:   ${mins} min`);
+        const res = await daemon.request("/ping");
+        console.log(`   ping:     ${res?.ok ? "ok" : "sin respuesta"}`);
+        return;
+      }
+    }
+  });
+
 // Default to interactive mode when no subcommand
 if (process.argv.length <= 2) {
   process.argv.push("interactive");
