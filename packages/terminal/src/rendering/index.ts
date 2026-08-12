@@ -6,7 +6,34 @@
  */
 
 import chalk from "chalk";
-import { renderMermaidAscii } from "beautiful-mermaid";
+import { createRequire } from "node:module";
+
+/**
+ * Mermaid rendering is optional and loaded on demand.
+ *
+ * It used to be a top-level import, which made this module — and therefore every
+ * consumer of it, including the agent — unloadable when the package is missing.
+ * That is too much blast radius for a decorative diagram: a headless agent turn
+ * needs no markdown renderer at all, let alone an ASCII diagram engine.
+ *
+ * The call site already degrades to highlighted raw source when rendering fails,
+ * so an absent package now takes that same designed path instead of breaking the
+ * import graph. Resolved once and cached, including the failure.
+ */
+type MermaidRenderer = (code: string, options: { theme: string }) => string;
+let mermaidRenderer: MermaidRenderer | null | undefined;
+
+function loadMermaid(): MermaidRenderer | null {
+  if (mermaidRenderer !== undefined) return mermaidRenderer;
+  try {
+    const require = createRequire(import.meta.url);
+    const mod = require("beautiful-mermaid") as { renderMermaidAscii?: MermaidRenderer };
+    mermaidRenderer = typeof mod.renderMermaidAscii === "function" ? mod.renderMermaidAscii : null;
+  } catch {
+    mermaidRenderer = null;
+  }
+  return mermaidRenderer;
+}
 
 // ── Code Block Syntax Highlighting ───────────────────────────
 
@@ -61,7 +88,9 @@ export function renderMarkdown(text: string): string {
         if (codeLang === "mermaid") {
           // Render mermaid diagrams as ASCII art
           try {
-            const ascii = renderMermaidAscii(code, { theme: "default" });
+            const renderMermaid = loadMermaid();
+            if (!renderMermaid) throw new Error("mermaid no disponible");
+            const ascii = renderMermaid(code, { theme: "default" });
             result.push(chalk.dim("  ┌─ mermaid " + "─".repeat(33)));
             for (const asciiLine of ascii.split("\n")) {
               result.push(chalk.dim("  │ ") + chalk.cyan(asciiLine));

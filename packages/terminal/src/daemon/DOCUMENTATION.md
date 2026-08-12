@@ -115,10 +115,12 @@ rotación de log. **Ninguno abre puertos salvo el que comprueba el bind.**
 Verificación manual del ciclo real (no cubierta por los tests, requiere spawn):
 arranque desacoplado → el shell padre muere → el daemon sigue vivo y responde → `stop` lo para.
 
-## Limitación conocida
+## El hijo hereda el grafo de imports del CLI
 
-El hijo se lanza con `process.argv[1]` (el entrypoint del CLI), así que **hereda todo el grafo de
-imports del CLI**: un import roto en cualquier parte del CLI impide arrancar el daemon. Hoy pasa
-con `beautiful-mermaid`, declarado en `package.json` pero **no instalado** en este entorno.
-Si eso se vuelve molesto, la solución es un entrypoint propio para el daemon (implica tocar el
-script de build, que hoy emite un único fichero).
+Se lanza con `process.argv[1]`, así que **cualquier import roto del CLI impide arrancar el daemon**.
+Ya mordió una vez: `rendering/` importaba `beautiful-mermaid` en el nivel superior y tumbaba el
+arranque entero por un renderizador de diagramas que el daemon no usa. Se resolvió haciendo esa
+carga perezosa, no añadiendo un entrypoint aparte.
+
+**Regla que se deriva**: cualquier dependencia opcional o decorativa que cuelgue del grafo del CLI
+debe cargarse bajo demanda. Un fallo al importarla no puede costar el proceso de fondo.

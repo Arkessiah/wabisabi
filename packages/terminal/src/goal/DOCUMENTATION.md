@@ -80,9 +80,9 @@ corrida**; sumar mensajes cuenta doble.
 
 ## Lo que falta (fase 2b)
 
-- **Ejecutar turnos**: el daemon tiene que poder correr un turno de agente headless. Hoy
-  `base-agent.ts` importa `rendering/` → `beautiful-mermaid`, declarado en `package.json` pero
-  **no instalado**, así que ningún turno headless arranca. Bloqueado por decisión de dependencias.
+- **Ejecutar turnos**: el daemon tiene que poder correr un turno de agente headless.
+  Ya **no está bloqueado** — la carga de `beautiful-mermaid` se hizo perezosa y el daemon arranca
+  por el entrypoint real del CLI.
 - **Uso de tokens por turno**: `SessionMessage` no guarda `usage`, así que `accountTokens` no tiene
   de dónde leer. Requiere añadir un campo opcional a la sesión (cambio de dato persistido,
   compatible hacia atrás por ser opcional).
