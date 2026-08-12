@@ -55,10 +55,9 @@ recibe SIGKILL deja su lock atrás; tratarlo como "ya está corriendo" dejaría 
 inarrancable hasta que el usuario borrase a mano un fichero que no sabe que existe. Por eso
 **cada lectura verifica que el PID esté vivo** (`kill(pid, 0)`; `EPERM` cuenta como vivo).
 
-Un lock corrupto o sin token también es rancio: una escritura truncada no puede dejar el daemon
-bloqueado para siempre.
-
-`status()` limpia el lock rancio como efecto secundario, así que se auto-repara.
+Un lock corrupto o sin token cuenta como reemplazable: una escritura truncada no puede dejar el
+daemon bloqueado para siempre. Pero se marca `unreadable`, **no** `dead`, y solo lo reemplaza el
+siguiente `start`.
 
 ## Orden de arranque (importa)
 
