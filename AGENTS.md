@@ -29,7 +29,7 @@ El CLI **escribe** las credenciales y la extensión las **lee**: tocar el format
 - **No añadir dependencias** ni cambiar versiones, features o alcance sin autorización explícita.
 - **Nunca** loguear ni persistir secretos, tokens, JWT ni contenido sensible.
 - **No borrar código que parezca importante** salvo que sea parte explícita de la tarea.
-- Cambios mínimos; preserva lo no relacionado del worktree.
+- Cambios mínimos; preserva lo no relacionado.
 - Actualiza la documentación dueña cuando cambien propiedad, contratos o invariantes.
 
 ## Invariantes de corrección
@@ -63,8 +63,8 @@ Claude Code / OpenCode: `bash scripts/sync-skills.sh`.
 ## Documentación
 
 Lee el `DOCUMENTATION.md` más cercano bajo `packages/**` antes de tocar un módulo (anclas:
-`tools/`, `routing/`, `auth/src/`, `cortex/`). Producto: `DOC/ES/`, **fuente de verdad**; `DOC/EN/` solo a
-petición. Ningún `.md` nuevo se commitea sin aprobación, salvo `README.md`.
+`tools/`, `routing/`, `auth/`, `cortex/`, `daemon/`, `goal/`). Producto: `DOC/ES/`, **fuente de
+verdad**; `DOC/EN/` solo a petición. Ningún `.md` se commitea sin aprobación, salvo `README.md`.
 
 ## Validación
 
