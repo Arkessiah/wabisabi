@@ -32,6 +32,22 @@ Sus futuros inquilinos son el bucle de objetivo y las tareas programadas.
 
 ## El lock y los procesos muertos
 
+**La escritura del lock es atómica** (temp + fsync + rename, vía `utils/atomic-write.ts`). Sin eso,
+un lector podía observar un lock a medio escribir, leerlo como malformado, declararlo rancio y
+arrancar un **segundo daemon junto al vivo**.
+
+**Leer no muta.** `status()` reporta el estado del lock pero **no lo borra**: solo `start`, que es
+quien va a publicar, reemplaza lo que hay. Antes `status` auto-reparaba, lo que convertía a
+cualquier observador en mutador de un fichero que no creó — y un `daemon status` inocente borraba
+un lock *ilegible*, que no prueba nada sobre si el proceso vive.
+
+**`LockState` es explícito**: `missing` · `alive` · `dead` (PID provablemente muerto) ·
+`unreadable` (no se puede saber). **"No se puede saber" nunca se colapsa en "muerto"**: solo un PID
+que no responde prueba la muerte. Lección tomada del daemon de OpenChamber/orca, donde tratar un
+"no lo sé" como muerte llegó a borrar endpoints que seguían sirviendo.
+
+
+
 `~/.wabisabi/daemon.lock` es la única fuente de verdad de "¿hay daemon y cómo le hablo?".
 
 **Un lock cuyo proceso está muerto es rancio, no un daemon corriendo.** Un daemon que crashea o

@@ -40,17 +40,28 @@ export function daemonHome(): string {
   return join(homedir(), ".wabisabi");
 }
 
-/** Current state, clearing a stale lock as a side effect so `status` self-heals. */
+/**
+ * Current state. **Reports; does not mutate.**
+ *
+ * An earlier version cleared a stale lock here so `status` would self-heal, but
+ * that made every observer a mutator of a file it did not create — and an
+ * unreadable lock (which proves nothing about liveness) would be deleted by a
+ * plain `daemon status`. Only `start`, the actor that intends to publish, clears.
+ */
 export function status(lockPath: string = defaultLockPath()): DaemonStatus {
-  const { lock, stale } = readLock(lockPath);
+  const { lock, state } = readLock(lockPath);
 
   if (!lock) {
-    if (stale) clearLock(lockPath);
-    return { running: false, staleLockCleared: stale || undefined };
+    return {
+      running: false,
+      lockState: state,
+      staleLock: state === "dead" || state === "unreadable" || undefined,
+    };
   }
 
   return {
     running: true,
+    lockState: state,
     pid: lock.pid,
     port: lock.port,
     startedAt: lock.startedAt,
@@ -153,6 +164,11 @@ export async function start(
   if (existing.running) {
     return { started: false, reason: "already-running", pid: existing.pid, port: existing.port };
   }
+
+  // We are the actor that intends to publish, so we are the one allowed to
+  // remove what is there. `claimLock` re-reads under the same rule, so this is
+  // only about surfacing an unreadable lock to the user instead of eating it.
+  if (existing.staleLock) clearLock(lockPath);
 
   mkdirSync(daemonHome(), { recursive: true });
   mkdirSync(defaultLogDir(), { recursive: true });

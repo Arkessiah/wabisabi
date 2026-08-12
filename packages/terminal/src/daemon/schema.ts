@@ -43,11 +43,16 @@ export interface DaemonLock {
 
 export interface DaemonStatus {
   running: boolean;
+  /** Why there is (or is not) a usable lock. See `lock.ts` LockState. */
+  lockState?: "missing" | "alive" | "dead" | "unreadable";
   pid?: number;
   port?: number;
   startedAt?: number;
   version?: string;
   uptimeMs?: number;
-  /** Set when a lock existed but its process was gone. */
-  staleLockCleared?: boolean;
+  /**
+   * A lock exists that no live process backs. It is NOT cleared by reading;
+   * the next `start` replaces it.
+   */
+  staleLock?: boolean;
 }

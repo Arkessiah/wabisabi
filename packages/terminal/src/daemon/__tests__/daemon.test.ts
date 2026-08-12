@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync, statSync } from "fs";
+import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync, statSync, readdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import {
@@ -20,6 +20,7 @@ import {
 import { DaemonLogger } from "../logger.js";
 import { createHandler, tokensEqual, LOOPBACK, startServer } from "../server.js";
 import { DaemonConfigSchema } from "../schema.js";
+import { status } from "../index.js";
 
 let dir: string;
 let lockPath: string;
@@ -46,7 +47,7 @@ describe("daemon config — opt-in", () => {
 
 describe("lock — un PID muerto es lock rancio, no un daemon vivo", () => {
   test("sin fichero: ni lock ni rancio", () => {
-    expect(readLock(lockPath)).toEqual({ lock: null, stale: false });
+    expect(readLock(lockPath)).toEqual({ lock: null, state: "missing", stale: false });
   });
 
   test("PID vivo: se devuelve el lock", () => {
@@ -87,6 +88,62 @@ describe("lock — un PID muerto es lock rancio, no un daemon vivo", () => {
     expect(isProcessAlive(-1)).toBe(false);
     expect(isProcessAlive(1.5)).toBe(false);
     expect(isProcessAlive(process.pid)).toBe(true);
+  });
+});
+
+describe("lock — \"no se puede saber\" no es \"muerto\"", () => {
+  test("el estado distingue missing / alive / dead / unreadable", () => {
+    expect(readLock(lockPath).state).toBe("missing");
+
+    writeLock({ pid: process.pid, port: 1, token: "t", startedAt: 1, version: "1.0.0" }, lockPath);
+    expect(readLock(lockPath).state).toBe("alive");
+
+    writeLock({ pid: 4194303, port: 1, token: "t", startedAt: 1, version: "1.0.0" }, lockPath);
+    expect(readLock(lockPath).state).toBe("dead");
+
+    writeFileSync(lockPath, "no soy json", "utf-8");
+    expect(readLock(lockPath).state).toBe("unreadable");
+  });
+
+  test("un lock ilegible NO se declara muerto", () => {
+    writeFileSync(lockPath, "{ truncado", "utf-8");
+    // Ilegible es "no se puede saber": no afirma que el proceso este muerto.
+    expect(readLock(lockPath).state).not.toBe("dead");
+  });
+
+  test("status REPORTA pero no borra: leer no muta", () => {
+    writeLock({ pid: 4194303, port: 1, token: "t", startedAt: 1, version: "1.0.0" }, lockPath);
+
+    const st = status(lockPath);
+    expect(st.running).toBe(false);
+    expect(st.staleLock).toBe(true);
+    expect(st.lockState).toBe("dead");
+    // El fichero sigue ahi: solo quien va a publicar lo reemplaza.
+    expect(existsSync(lockPath)).toBe(true);
+  });
+
+  test("status sobre un lock ilegible tampoco lo borra", () => {
+    writeFileSync(lockPath, "basura", "utf-8");
+    status(lockPath);
+    expect(existsSync(lockPath)).toBe(true);
+  });
+});
+
+describe("lock — escritura atomica", () => {
+  test("no deja ficheros temporales detras", () => {
+    writeLock({ pid: process.pid, port: 1, token: "t", startedAt: 1, version: "1.0.0" }, lockPath);
+    const leftovers = readdirSync(dir).filter((f) => f.includes(".tmp."));
+    expect(leftovers).toEqual([]);
+  });
+
+  test("sobrescribir un lock existente no lo deja a medias", () => {
+    writeLock({ pid: 1, port: 1, token: "viejo", startedAt: 1, version: "1.0.0" }, lockPath);
+    writeLock({ pid: process.pid, port: 2, token: "nuevo", startedAt: 2, version: "1.0.0" }, lockPath);
+
+    // Un lock a medio escribir se leeria como "unreadable"; debe ser legible y nuevo.
+    const res = readLock(lockPath);
+    expect(res.state).toBe("alive");
+    expect(res.lock?.token).toBe("nuevo");
   });
 });
 

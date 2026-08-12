@@ -10,14 +10,8 @@
  * a file they do not know about. Every read therefore verifies the PID is alive.
  */
 
-import {
-  existsSync,
-  readFileSync,
-  writeFileSync,
-  unlinkSync,
-  mkdirSync,
-  chmodSync,
-} from "fs";
+import { existsSync, readFileSync, unlinkSync, mkdirSync, chmodSync } from "fs";
+import { atomicWriteFileSync } from "../utils/atomic-write.js";
 import { join, dirname } from "path";
 import { homedir } from "os";
 import { randomBytes } from "crypto";
@@ -74,10 +68,26 @@ function parseLock(raw: string): DaemonLock | null {
   }
 }
 
+/**
+ * Why there is no usable lock. Kept explicit because **"cannot tell" must never
+ * collapse into "dead"**: clearing a lock we merely failed to read could delete
+ * the record of a live daemon and let a second one start beside it.
+ */
+export type LockState =
+  /** No lock file at all. */
+  | "missing"
+  /** Lock read and its process answers. */
+  | "alive"
+  /** Lock read and its PID is provably gone. Safe to replace. */
+  | "dead"
+  /** Unreadable or malformed. Provably nothing; do NOT infer death. */
+  | "unreadable";
+
 export interface LockReadResult {
   /** The lock, only when its process is alive. */
   lock: DaemonLock | null;
-  /** True when a lock file existed but was dead or unparseable. */
+  state: LockState;
+  /** Kept for callers that only need "there is something to replace". */
   stale: boolean;
 }
 
@@ -86,20 +96,20 @@ export interface LockReadResult {
  * a truncated write must not wedge the daemon permanently.
  */
 export function readLock(lockPath: string = defaultLockPath()): LockReadResult {
-  if (!existsSync(lockPath)) return { lock: null, stale: false };
+  if (!existsSync(lockPath)) return { lock: null, state: "missing", stale: false };
 
   let raw: string;
   try {
     raw = readFileSync(lockPath, "utf-8");
   } catch {
-    return { lock: null, stale: true };
+    return { lock: null, state: "unreadable", stale: true };
   }
 
   const lock = parseLock(raw);
-  if (!lock) return { lock: null, stale: true };
-  if (!isProcessAlive(lock.pid)) return { lock: null, stale: true };
+  if (!lock) return { lock: null, state: "unreadable", stale: true };
+  if (!isProcessAlive(lock.pid)) return { lock: null, state: "dead", stale: true };
 
-  return { lock, stale: false };
+  return { lock, state: "alive", stale: false };
 }
 
 /** Remove the lock file. Never throws: a missing lock is the desired state. */
@@ -118,7 +128,10 @@ export function clearLock(lockPath: string = defaultLockPath()): void {
  */
 export function writeLock(lock: DaemonLock, lockPath: string = defaultLockPath()): void {
   mkdirSync(dirname(lockPath), { recursive: true });
-  writeFileSync(lockPath, JSON.stringify(lock, null, 2), {
+  // Atomic (temp + fsync + rename): a reader must never observe a half-written
+  // lock. A partial read would look malformed, an observer would call it stale,
+  // and a second daemon would start alongside the live one.
+  atomicWriteFileSync(lockPath, JSON.stringify(lock, null, 2), {
     encoding: "utf-8",
     mode: LOCK_MODE,
   });

@@ -886,7 +886,10 @@ program
         const st = daemon.status();
         if (!st.running) {
           console.log("👻 Daemon: parado" + (daemonCfg.enabled ? "" : " (desactivado en config)"));
-          if (st.staleLockCleared) console.log("   (se limpió un lock huérfano de un proceso muerto)");
+          if (st.staleLock) {
+            const why = st.lockState === "unreadable" ? "ilegible" : "de un proceso muerto";
+            console.log(`   (hay un lock huérfano ${why}; el próximo 'start' lo reemplaza)`);
+          }
           return;
         }
         const mins = Math.floor((st.uptimeMs ?? 0) / 60000);
