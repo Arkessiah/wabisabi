@@ -6,14 +6,16 @@ Mantener una sesión trabajando hacia un **objetivo** en vez de responder un tur
 inquilino previsto del [daemon](../daemon/DOCUMENTATION.md), para que el objetivo siga vivo con la
 terminal cerrada.
 
-**Estado: fase 2a.** La lógica de decisión y el auditor están hechos y probados.
-**No está cableado a ejecución real de turnos** (fase 2b) — ver "Lo que falta".
+**Estado**: lógica, auditor, persistencia y bucle hechos y probados. Lo que falta es **conectar
+`readFacts` y `dispatch` al agente real** — ver "Lo que falta".
 
 ## Ficheros
 
 - `schema.ts` — `SessionGoal`, estados, veredictos y las constantes de seguridad.
 - `tick.ts` — **funciones puras**: `decide()`, `accountTokens()`, `turnCost()`, `resume()`.
 - `auditor.ts` — el auditor independiente sobre `cortex`.
+- `store.ts` — un objetivo por sesión en `~/.wabisabi/goals/<sessionId>.json`.
+- `runtime.ts` — el bucle: `tickGoal`, `tickAll`, `startGoalLoop`.
 
 `tick.ts` no hace I/O, no llama al modelo, no toca el reloj. Todo lo sutil de un bucle autónomo
 vive ahí precisamente para poder probarlo exhaustivamente sin ejecutar nada.
@@ -78,11 +80,33 @@ corrida**; sumar mensajes cuenta doble.
 | `AUDIT_FAIL_LIMIT` | 2 | Una continuación sin auditar, no más |
 | `MAX_OBJECTIVE_CHARS` | 5.000 | Un objetivo que no cabe se rechaza, no se recorta |
 
-## Lo que falta (fase 2b)
+## Persistencia y bucle
 
-- **Ejecutar turnos**: el daemon tiene que poder correr un turno de agente headless.
-  Ya **no está bloqueado** — la carga de `beautiful-mermaid` se hizo perezosa y el daemon arranca
-  por el entrypoint real del CLI.
+Un objetivo por sesión, en `~/.wabisabi/goals/<sessionId>.json` (escritura atómica). Se guarda
+fuera del transcript porque el objetivo puede ocupar varios KB y el transcript se reescribe en cada
+turno. El id del payload es el **guardia contra escrituras rancias**: un tick que estaba auditando
+cuando el usuario reemplazó la meta no puede resucitar el estado viejo (`saveIfCurrent`).
+
+**Orden que cuesta datos si se rompe: se persiste ANTES de despachar.** Un crash tras la escritura
+solo espera al siguiente ciclo; al revés, se enviaría la misma continuación dos veces sin contar
+ninguna. Hay un test que comprueba que al despachar el turno ya está contado en disco.
+
+Otras reglas del bucle:
+
+- **El auditor solo se llama si hace falta.** El tick decide primero con un thunk sonda; si una
+  parada dura o una compactación ya resuelven, no se gasta una llamada al modelo.
+- **Los ciclos no se solapan**: una auditoría lenta no puede apilar ticks y despachar dos
+  continuaciones para el mismo objetivo.
+- **Una sesión rota no arrastra a las demás**: un objetivo que lanza se registra y se salta.
+- El intervalo es la única señal en la que el daemon puede confiar: no hay canal vivo hacia un CLI
+  que puede no estar corriendo.
+
+## Lo que falta
+
+- **Conectar `readFacts` y `dispatch` al agente real.** Hoy son dependencias inyectadas con
+  implementación de prueba. El daemon ya arranca por el entrypoint real del CLI (la carga de
+  `beautiful-mermaid` se hizo perezosa), así que el camino está abierto.
+- **Arrancar el bucle dentro del daemon** (`startGoalLoop` desde `runDaemon`).
 - **Uso de tokens por turno**: `SessionMessage` no guarda `usage`, así que `accountTokens` no tiene
   de dónde leer. Requiere añadir un campo opcional a la sesión (cambio de dato persistido,
   compatible hacia atrás por ser opcional).
@@ -91,7 +115,7 @@ corrida**; sumar mensajes cuenta doble.
 
 ## Validación
 
-`bun test src/goal/` — 45 tests: orden de decisión, abort=pausa, las tres paradas duras, la
+`bun test src/goal/` — 65 tests: orden de decisión, abort=pausa, las tres paradas duras, la
 compactación no juzgada, las rachas de bloqueo y de fallo de auditoría, la contabilidad segmentada
 y monótona, y la higiene del prompt del auditor (escapado XML, recorte por el final, rechazo de
 veredictos inventados). Ninguno necesita modelo ni red.
