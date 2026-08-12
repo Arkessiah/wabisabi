@@ -112,12 +112,34 @@ export function runDaemon(
 
   logger.info(`daemon arrancado (pid ${process.pid}, puerto ${server.port})`);
 
+  // The goal loop is the daemon's first tenant. Wiring is lazy and best-effort:
+  // a daemon that cannot start the loop is still a working daemon, and saying so
+  // in the log beats refusing to run.
+  let goalLoop: { stop: () => void } | null = null;
+  void (async () => {
+    try {
+      const [{ startGoalLoop }, { GoalStore }, { createAgentBridge }] = await Promise.all([
+        import("../goal/runtime.js"),
+        import("../goal/store.js"),
+        import("../goal/bridge.js"),
+      ]);
+      const store = new GoalStore();
+      goalLoop = startGoalLoop(
+        { store, ...createAgentBridge({ log: (m) => logger.info(m) }), log: (m) => logger.info(m) },
+      );
+      logger.info("bucle de objetivos activo");
+    } catch (error) {
+      logger.error(`no se pudo arrancar el bucle de objetivos: ${String(error)}`);
+    }
+  })();
+
   let shuttingDown = false;
   function shutdown(reason: string): void {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info(`parando daemon (${reason})`);
     try {
+      goalLoop?.stop();
       server.stop();
     } finally {
       // Only clear the lock if it is still OURS: another instance may have

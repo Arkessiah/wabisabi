@@ -6,8 +6,8 @@ Mantener una sesión trabajando hacia un **objetivo** en vez de responder un tur
 inquilino previsto del [daemon](../daemon/DOCUMENTATION.md), para que el objetivo siga vivo con la
 terminal cerrada.
 
-**Estado**: lógica, auditor, persistencia y bucle hechos y probados. Lo que falta es **conectar
-`readFacts` y `dispatch` al agente real** — ver "Lo que falta".
+**Estado**: el bucle corre dentro del daemon y lee sesiones reales. Lo único que falta es el
+**ejecutor de turnos headless** — ver "Lo que falta".
 
 ## Ficheros
 
@@ -16,6 +16,8 @@ terminal cerrada.
 - `auditor.ts` — el auditor independiente sobre `cortex`.
 - `store.ts` — un objetivo por sesión en `~/.wabisabi/goals/<sessionId>.json`.
 - `runtime.ts` — el bucle: `tickGoal`, `tickAll`, `startGoalLoop`.
+- `facts.ts` — traduce un transcript real al snapshot que consume `decide()`.
+- `bridge.ts` — ata `readFacts` / `audit` / `dispatch` a la sesión, cortex y el agente.
 
 `tick.ts` no hace I/O, no llama al modelo, no toca el reloj. Todo lo sutil de un bucle autónomo
 vive ahí precisamente para poder probarlo exhaustivamente sin ejecutar nada.
@@ -101,21 +103,44 @@ Otras reglas del bucle:
 - El intervalo es la única señal en la que el daemon puede confiar: no hay canal vivo hacia un CLI
   que puede no estar corriendo.
 
+## Leer los hechos de un transcript real (`facts.ts`)
+
+Cada campo se deriva de una **señal explícita**, no de la prosa. El que sostiene el peso es la
+**quiescencia**: el bucle no puede mandar una continuación con un turno en vuelo, así que la sesión
+solo se considera quieta cuando el **último** mensaje es del asistente. Un mensaje de usuario
+colgando significa que el agente aún no ha contestado; uno de tool, que está a mitad de tool-call.
+
+Los mensajes `system` se descartan: son contexto inyectado (skills, recordatorios), y uno al final
+se leería como "no quieto".
+
+Detalle que evita un falso positivo caro: `lastTurnErrored` mira si el turno **empieza** por
+`Error:`, no si lo menciona — "he arreglado el Error: del test" es trabajo, no un fallo. Y no se
+lee `usage` de un turno que aún no ha terminado.
+
+`usage` es **opcional** en `SessionMessage`: las sesiones escritas antes cargan igual, y su
+ausencia significa **desconocido**, nunca cero.
+
+## El bridge y el ejecutor ausente (`bridge.ts`)
+
+`dispatch` **no tiene implementación por defecto y lanza**. Es deliberado: un dispatch que no
+hiciera nada dejaría al bucle contando continuaciones que nunca ocurrieron y quemando el
+presupuesto de turnos en silencio. Mientras no se le pase un `runTurn`, el tick se registra como
+fallido y se ve en el log.
+
+El prompt de continuación lleva el objetivo **XML-escapado** y exige cerrar el turno con un parte
+factual de hecho/verificado/pendiente — porque el auditor solo ve ese último turno: ese parte *es*
+su evidencia.
+
 ## Lo que falta
 
-- **Conectar `readFacts` y `dispatch` al agente real.** Hoy son dependencias inyectadas con
-  implementación de prueba. El daemon ya arranca por el entrypoint real del CLI (la carga de
-  `beautiful-mermaid` se hizo perezosa), así que el camino está abierto.
-- **Arrancar el bucle dentro del daemon** (`startGoalLoop` desde `runDaemon`).
-- **Uso de tokens por turno**: `SessionMessage` no guarda `usage`, así que `accountTokens` no tiene
-  de dónde leer. Requiere añadir un campo opcional a la sesión (cambio de dato persistido,
-  compatible hacia atrás por ser opcional).
-- Persistencia del objetivo junto a la sesión, y comandos (`/goal`, `wabisabi goal ...`).
+- **El ejecutor de turnos headless** (`runTurn`): ejecutar un turno de agente sin TUI. Es la última
+  pieza; todo lo demás está conectado y corriendo.
+- Comandos de usuario (`/goal`, `wabisabi goal ...`) para crear, pausar y reanudar objetivos.
 - Notificación al asentar con la UI cerrada.
 
 ## Validación
 
-`bun test src/goal/` — 65 tests: orden de decisión, abort=pausa, las tres paradas duras, la
+`bun test src/goal/` — 92 tests: orden de decisión, abort=pausa, las tres paradas duras, la
 compactación no juzgada, las rachas de bloqueo y de fallo de auditoría, la contabilidad segmentada
 y monótona, y la higiene del prompt del auditor (escapado XML, recorte por el final, rechazo de
 veredictos inventados). Ninguno necesita modelo ni red.

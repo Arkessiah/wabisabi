@@ -1436,6 +1436,16 @@ export abstract class BaseAgent {
           role: "assistant",
           content: answer,
           timestamp: Date.now(),
+          // Recorded so a goal loop can price the turn later. Absent when the
+          // provider reported nothing: unknown must not be stored as zero.
+          ...(result.usage
+            ? {
+                usage: {
+                  promptTokens: result.usage.prompt_tokens,
+                  completionTokens: result.usage.completion_tokens,
+                },
+              }
+            : {}),
         });
 
         // Track model usage in soul
