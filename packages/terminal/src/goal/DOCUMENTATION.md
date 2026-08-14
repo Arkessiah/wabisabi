@@ -18,6 +18,7 @@ terminal cerrada.
 - `runtime.ts` — el bucle: `tickGoal`, `tickAll`, `startGoalLoop`.
 - `facts.ts` — traduce un transcript real al snapshot que consume `decide()`.
 - `bridge.ts` — ata `readFacts` / `audit` / `dispatch` a la sesión, cortex y el agente.
+- `harvest.ts` — destila un objetivo cumplido en una **propuesta** de skill.
 
 `tick.ts` no hace I/O, no llama al modelo, no toca el reloj. Todo lo sutil de un bucle autónomo
 vive ahí precisamente para poder probarlo exhaustivamente sin ejecutar nada.
@@ -131,6 +132,43 @@ El prompt de continuación lleva el objetivo **XML-escapado** y exige cerrar el 
 factual de hecho/verificado/pendiente — porque el auditor solo ve ese último turno: ese parte *es*
 su evidencia.
 
+## Cosecha de skills (`harvest.ts`)
+
+Un objetivo que el auditor cierra como `complete` es **un camino que alguien recorrió hasta el
+final**: justo lo que merece escribirse para que el siguiente agente no lo redescubra. Al asentar,
+el bridge destila la sesión en una skill.
+
+### La regla de seguridad: propuesta, nunca instalación
+
+El borrador se escribe con **`status: draft`**, y `SkillsManager` trata los borradores como
+invisibles: **no entran en el índice, no se auto-cargan, y la tool `skill` no puede abrirlos**.
+
+El motivo es concreto: wabisabi **auto-carga** la skill que casa con la petición. Una skill que el
+agente se escribe a sí mismo y que además se inyecta sola en sus futuros prompts es un agente
+**reescribiendo sus propias instrucciones sin que nadie las lea**. Adoptar es un acto humano.
+
+Adoptar = quitar la línea `status: draft` (a mano, o `wabisabi skills adopt <nombre>`). Las
+ediciones del usuario en el cuerpo **sobreviven** a la adopción — de hecho editarlo antes de
+adoptar es el uso previsto.
+
+### Qué se cosecha y qué no
+
+- Solo objetivos `complete`, y solo con **≥2 turnos**: un objetivo de un turno no enseñó nada, y
+  cosechar cada final enterraría las skills buenas bajo ruido.
+- El resumen conserva la **cola** de la sesión: los turnos finales tienen el resultado verificado,
+  los primeros los falsos comienzos que no queremos canonizar.
+- Al destilador se le pide **procedimiento generalizable**, y se le prohíbe explícitamente narrar la
+  sesión, incluir rutas concretas, secretos o datos del usuario.
+- **Nunca sobrescribe** una skill existente, adoptada o borrador: puede llevar ediciones del usuario.
+- Todo el camino es best-effort: un destilador caído, una salida con la forma equivocada o un cuerpo
+  trivial **no escriben nada** y **no afectan al objetivo que acaba de cumplirse**.
+
+### Cómo se entera el usuario
+
+- El daemon lo registra en su log de forma explícita, con la ruta y el comando para adoptarla.
+- `/skills` en el REPL y `wabisabi skills` listan las propuestas pendientes **antes** que las
+  activas, diciendo que no se cargan en ningún prompt.
+
 ## Lo que falta
 
 - **El ejecutor de turnos headless** (`runTurn`): ejecutar un turno de agente sin TUI. Es la última
@@ -140,7 +178,7 @@ su evidencia.
 
 ## Validación
 
-`bun test src/goal/` — 92 tests: orden de decisión, abort=pausa, las tres paradas duras, la
+`bun test src/goal/` — 116 tests: orden de decisión, abort=pausa, las tres paradas duras, la
 compactación no juzgada, las rachas de bloqueo y de fallo de auditoría, la contabilidad segmentada
 y monótona, y la higiene del prompt del auditor (escapado XML, recorte por el final, rechazo de
 veredictos inventados). Ninguno necesita modelo ni red.

@@ -48,6 +48,13 @@ export interface SkillMeta {
   scope: SkillScope;
   path: string;
   triggers: string[];
+  /**
+   * Harvested from a completed goal and NOT yet adopted by the user.
+   * A draft is never indexed, never auto-loaded and never returned by the
+   * `skill` tool: a self-written procedure that installs itself into future
+   * prompts would be an agent quietly rewriting its own instructions.
+   */
+  draft: boolean;
 }
 
 export interface SkillLoadResult {
@@ -215,11 +222,22 @@ export class SkillsManager {
       description: description.slice(0, MAX_DESC_LEN),
       scope,
       path,
+      draft: (parsed.data.status ?? "").trim().toLowerCase() === "draft",
       triggers: explicit?.length ? explicit : deriveTriggers(name, description),
     };
   }
 
+  /** Adopted skills only. This is what the index, the matcher and the tool see. */
   list(): SkillMeta[] {
+    return this.all().filter((s) => !s.draft);
+  }
+
+  /** Harvested proposals waiting for the user. Never fed to the model. */
+  listDrafts(): SkillMeta[] {
+    return this.all().filter((s) => s.draft);
+  }
+
+  private all(): SkillMeta[] {
     this.scan();
     return [...this.skills.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -231,14 +249,16 @@ export class SkillsManager {
 
   has(name: string): boolean {
     this.scan();
-    return this.skills.has(name);
+    const meta = this.skills.get(name);
+    return meta !== undefined && !meta.draft;
   }
 
   /** Full skill content, clamped. Returns null when the skill does not exist. */
   load(name: string, maxChars = MAX_AUTOLOAD_CHARS): SkillLoadResult | null {
     this.scan();
     const meta = this.skills.get(name);
-    if (!meta) return null;
+    // A draft is invisible to every model-facing path, including this one.
+    if (!meta || meta.draft) return null;
 
     let raw: string;
     try {

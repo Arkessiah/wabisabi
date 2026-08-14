@@ -235,6 +235,19 @@ export abstract class BaseAgent {
       case "skills": {
         const mgr = projectContext.getSkills();
         const skills = mgr?.list() ?? [];
+        const drafts = mgr?.listDrafts() ?? [];
+
+        if (drafts.length > 0) {
+          let head = chalk.bold("\n  Propuestas de skill (cosechadas de objetivos cumplidos)\n");
+          for (const d of drafts) {
+            head += `  ${chalk.yellow(d.name.padEnd(28))} ${chalk.dim(d.description.slice(0, 46))}\n`;
+            head += chalk.dim(`  ${" ".repeat(28)} ${d.path}\n`);
+          }
+          head += chalk.dim("\n  No se cargan en ningun prompt hasta que las adoptes.\n");
+          head += chalk.dim("  Revisalas, editalas, y luego: wabisabi skills adopt <nombre>\n");
+          this.io.writeOutput(head);
+        }
+
         if (skills.length === 0) {
           this.io.writeOutput(
             chalk.dim("\n  Sin skills. Crea .agents/skills/<nombre>/SKILL.md\n"),

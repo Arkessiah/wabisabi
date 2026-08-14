@@ -9,12 +9,14 @@
  * daemon only pays for them when the loop actually starts.
  */
 
+import { join } from "path";
 import { SessionStorage } from "../session/storage.js";
 import { CortexClient } from "../cortex/client.js";
 import { CortexConfigSchema } from "../cortex/schema.js";
 import { configManager } from "../config/index.js";
 import { readFactsFromSession } from "./facts.js";
 import { audit as runAudit } from "./auditor.js";
+import { harvestSkill } from "./harvest.js";
 import type { TranscriptFacts } from "./tick.js";
 import type { SessionGoal } from "./schema.js";
 
@@ -26,6 +28,10 @@ export interface BridgeOptions {
   cortex?: CortexClient;
   /** Overrides how a continuation turn is executed. */
   runTurn?: (goal: SessionGoal, prompt: string) => Promise<void>;
+  /** Where harvested skill proposals land. Defaults to the project's own. */
+  skillsDir?: string;
+  /** Told when a proposal was written, so the user finds out. */
+  onSkillProposed?: (name: string, path: string) => void;
 }
 
 /** Built inline: the objective is untrusted user data, so it is XML-escaped. */
@@ -97,6 +103,40 @@ export function createAgentBridge(options: BridgeOptions = {}) {
       if (!last) return { ok: false as const, reason: "sin turno que auditar" };
       void facts;
       return runAudit(cortex, goal.objective, last.content);
+    },
+
+    /**
+     * A completed goal is a path someone walked to the end, so it is offered as
+     * a skill. Best-effort and non-blocking by design: harvesting is a bonus and
+     * must never affect the goal that just succeeded.
+     */
+    onSettled: (goal: SessionGoal, reason: string): void => {
+      void reason;
+      if (goal.status !== "complete") return;
+      void (async () => {
+        try {
+          const session = await storage.load(goal.sessionId);
+          if (!session) return;
+
+          const result = await harvestSkill(
+            {
+              skillsDir: options.skillsDir ?? join(session.projectRoot, ".agents", "skills"),
+              distill: async (prompt) => {
+                const res = await cortex.generateJSON<unknown>(prompt, { maxTokens: 1024 });
+                return res.ok ? res.value : null;
+              },
+              log,
+            },
+            { goal, session },
+          );
+
+          if (result.harvested && result.name && result.path) {
+            options.onSkillProposed?.(result.name, result.path);
+          }
+        } catch (error) {
+          log(`cosecha de skill fallida (no afecta al objetivo): ${String(error)}`);
+        }
+      })();
     },
 
     dispatch: async (goal: SessionGoal): Promise<void> => {

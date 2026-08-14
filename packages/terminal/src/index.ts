@@ -828,6 +828,54 @@ program
   });
 
 program
+  .command("skills [action] [name]")
+  .description("🧩 Project skills: list, and adopt harvested proposals")
+  .action(async (action: string = "list", name?: string) => {
+    const { SkillsManager } = await import("./context/skills.js");
+    const { adoptDraft } = await import("./goal/harvest.js");
+    const { projectContext } = await import("./context/index.js");
+    const path = await import("path");
+
+    await projectContext.initialize();
+    const root = projectContext.getProjectRoot();
+    const skillsDir = path.join(root, ".agents", "skills");
+    const mgr = new SkillsManager(root);
+
+    if (action === "adopt") {
+      if (!name) {
+        console.error("❌ Falta el nombre: wabisabi skills adopt <nombre>");
+        process.exitCode = 1;
+        return;
+      }
+      if (adoptDraft(skillsDir, name)) {
+        console.log(`🧩 Skill "${name}" adoptada. Ya entra en el indice y puede auto-cargarse.`);
+      } else {
+        console.error(`❌ No hay ninguna propuesta pendiente llamada "${name}".`);
+        process.exitCode = 1;
+      }
+      return;
+    }
+
+    const drafts = mgr.listDrafts();
+    const adopted = mgr.list();
+
+    if (drafts.length > 0) {
+      console.log("\n🧩 Propuestas pendientes (no se cargan en ningun prompt):");
+      for (const d of drafts) {
+        console.log(`   ${d.name}  —  ${d.description.slice(0, 60)}`);
+        console.log(`      ${d.path}`);
+      }
+      console.log("\n   Revisalas y edita lo que quieras; luego: wabisabi skills adopt <nombre>\n");
+    }
+
+    console.log(adopted.length > 0 ? "🧩 Skills activas:" : "🧩 No hay skills activas.");
+    for (const s of adopted) {
+      console.log(`   ${s.name} [${s.scope}]  —  ${s.description.slice(0, 60)}`);
+    }
+    for (const w of mgr.getWarnings()) console.log(`   ! ${w}`);
+  });
+
+program
   .command("daemon [action]")
   .description("👻 Background process (opt-in): start, stop, status, logs, run")
   .action(async (action: string = "status") => {

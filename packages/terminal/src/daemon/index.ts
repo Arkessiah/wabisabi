@@ -124,9 +124,19 @@ export function runDaemon(
         import("../goal/bridge.js"),
       ]);
       const store = new GoalStore();
-      goalLoop = startGoalLoop(
-        { store, ...createAgentBridge({ log: (m) => logger.info(m) }), log: (m) => logger.info(m) },
-      );
+      goalLoop = startGoalLoop({
+        store,
+        ...createAgentBridge({
+          log: (m) => logger.info(m),
+          // The user must find out a skill was written on their behalf.
+          onSkillProposed: (name, path) =>
+            logger.info(
+              `PROPUESTA DE SKILL "${name}" — no se carga en ningun prompt hasta adoptarla. ` +
+                `Revisala en ${path} y luego: wabisabi skills adopt ${name}`,
+            ),
+        }),
+        log: (m) => logger.info(m),
+      });
       logger.info("bucle de objetivos activo");
     } catch (error) {
       logger.error(`no se pudo arrancar el bucle de objetivos: ${String(error)}`);
