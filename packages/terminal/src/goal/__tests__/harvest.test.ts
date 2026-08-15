@@ -15,6 +15,7 @@ import {
   extractWorkSummary,
   harvestSkill,
   isWorthHarvesting,
+  parseDistillOutput,
   renderDraft,
   sanitizeName,
 } from "../harvest.js";
@@ -60,6 +61,17 @@ function session(contents: string[] = ["hice A", "luego B y lo verifique"]): Ses
     updated: 1,
   };
 }
+
+/** What the distiller actually returns: line-based text, not JSON. */
+const goodAnswer = [
+  "NAME: migrar-a-bun-test",
+  "DESCRIPTION: Use al migrar una suite de tests a bun:test",
+  "BODY:",
+  "## Pasos",
+  "1. Cambia el import a `bun:test`; `vi.mock` no existe, usa `mock.module`.",
+  "2. Los ficheros comparten proceso: aisla el estado con mkdtempSync por test.",
+  "3. Corre la suite ENTERA, no fichero a fichero: la contaminacion solo sale junta.",
+].join("\n");
 
 const goodDraft = {
   name: "migrar-a-bun-test",
@@ -110,10 +122,21 @@ describe("nombres", () => {
 });
 
 describe("prompt de destilacion", () => {
-  test("pide procedimiento generalizable, no la cronica de la sesion", () => {
+  test("pide conocimiento que ahorre trabajo, no la cronica de la sesion", () => {
     const p = buildDistillPrompt({ goal: goal(), session: session() });
-    expect(p).toContain("generalizable");
+    expect(p).toContain("AHORRE TRABAJO");
     expect(p).toContain("NADA de narrar");
+  });
+
+  test("rechaza explicitamente los pasos obvios y prefiere no escribir nada", () => {
+    // Sin esto el destilador produce boilerplate tipo "lee el fichero, analizalo".
+    const p = buildDistillPrompt({ goal: goal(), session: session() });
+    expect(p).toContain("RECHAZA escribir pasos obvios");
+    expect(p).toContain("Ante la duda, body vacio");
+  });
+
+  test("pide el mismo idioma que el objetivo", () => {
+    expect(buildDistillPrompt({ goal: goal(), session: session() })).toContain("MISMO idioma");
   });
 
   test("prohibe explicitamente secretos y datos del usuario", () => {
@@ -136,10 +159,35 @@ describe("prompt de destilacion", () => {
   });
 });
 
+describe("parseo de la salida del destilador", () => {
+  test("formato linea a linea con markdown multilinea en el cuerpo", () => {
+    const d = parseDistillOutput(goodAnswer);
+    expect(d?.name).toBe("migrar-a-bun-test");
+    expect(d?.body).toContain("## Pasos");
+    expect(d?.body.split("\n").length).toBeGreaterThan(2);
+  });
+
+  test("tolera que el modelo lo envuelva en un fence de codigo", () => {
+    expect(parseDistillOutput("```\n" + goodAnswer + "\n```")?.name).toBe("migrar-a-bun-test");
+  });
+
+  test("sin las tres marcas, se rechaza", () => {
+    expect(parseDistillOutput("aqui tienes tu skill!")).toBeNull();
+    expect(parseDistillOutput("NAME: x\nDESCRIPTION: y")).toBeNull();
+  });
+
+  test("el cuerpo puede llevar saltos de linea sin escapar (lo que rompia el JSON)", () => {
+    // Este era el fallo real: el modelo metia newlines literales en el string
+    // JSON y se perdia justo el trabajo bueno.
+    const d = parseDistillOutput("NAME: a-b\nDESCRIPTION: d\nBODY:\nlinea1\n\nlinea2\n");
+    expect(d?.body).toBe("linea1\n\nlinea2");
+  });
+});
+
 describe("la propuesta NO se instala sola", () => {
   test("se escribe con status: draft", async () => {
     const res = await harvestSkill(
-      { skillsDir, distill: async () => goodDraft },
+      { skillsDir, distill: async () => goodAnswer },
       { goal: goal(), session: session() },
     );
 
@@ -151,7 +199,7 @@ describe("la propuesta NO se instala sola", () => {
 
   test("SkillsManager NO la indexa ni la deja auto-cargar", async () => {
     await harvestSkill(
-      { skillsDir, distill: async () => goodDraft },
+      { skillsDir, distill: async () => goodAnswer },
       { goal: goal(), session: session() },
     );
 
@@ -165,7 +213,7 @@ describe("la propuesta NO se instala sola", () => {
 
   test("la tool `skill` no puede cargar un borrador", async () => {
     await harvestSkill(
-      { skillsDir, distill: async () => goodDraft },
+      { skillsDir, distill: async () => goodAnswer },
       { goal: goal(), session: session() },
     );
 
@@ -176,7 +224,7 @@ describe("la propuesta NO se instala sola", () => {
 
   test("el fichero explica como adoptarla", async () => {
     await harvestSkill(
-      { skillsDir, distill: async () => goodDraft },
+      { skillsDir, distill: async () => goodAnswer },
       { goal: goal(), session: session() },
     );
     const content = readFileSync(join(skillsDir, "migrar-a-bun-test", "SKILL.md"), "utf-8");
@@ -187,7 +235,7 @@ describe("la propuesta NO se instala sola", () => {
 describe("adopcion", () => {
   test("adoptar la hace visible y auto-cargable", async () => {
     await harvestSkill(
-      { skillsDir, distill: async () => goodDraft },
+      { skillsDir, distill: async () => goodAnswer },
       { goal: goal(), session: session() },
     );
 
@@ -205,7 +253,7 @@ describe("adopcion", () => {
 
   test("adoptar una skill que ya estaba adoptada devuelve false", async () => {
     await harvestSkill(
-      { skillsDir, distill: async () => goodDraft },
+      { skillsDir, distill: async () => goodAnswer },
       { goal: goal(), session: session() },
     );
     adoptDraft(skillsDir, "migrar-a-bun-test");
@@ -214,7 +262,7 @@ describe("adopcion", () => {
 
   test("las ediciones del usuario en el cuerpo sobreviven a la adopcion", async () => {
     await harvestSkill(
-      { skillsDir, distill: async () => goodDraft },
+      { skillsDir, distill: async () => goodAnswer },
       { goal: goal(), session: session() },
     );
     const path = join(skillsDir, "migrar-a-bun-test", "SKILL.md");
@@ -245,15 +293,23 @@ describe("la cosecha no puede hacer daño", () => {
 
   test("una salida sin la forma esperada se rechaza", async () => {
     const res = await harvestSkill(
-      { skillsDir, distill: async () => ({ titulo: "no es esto" }) },
+      { skillsDir, distill: async () => "no tiene el formato pedido" },
       { goal: goal(), session: session() },
     );
     expect(res.reason).toBe("distill-failed");
   });
 
+  test("un cuerpo de una sola linea no es un procedimiento", async () => {
+    const res = await harvestSkill(
+      { skillsDir, distill: async () => "NAME: x\nDESCRIPTION: y\nBODY:\nusa la tool read" },
+      { goal: goal(), session: session() },
+    );
+    expect(res.reason).toBe("empty");
+  });
+
   test("un cuerpo vacio o trivial no genera fichero", async () => {
     const res = await harvestSkill(
-      { skillsDir, distill: async () => ({ ...goodDraft, body: "nada" }) },
+      { skillsDir, distill: async () => "NAME: x\nDESCRIPTION: y\nBODY:\nnada" },
       { goal: goal(), session: session() },
     );
     expect(res.reason).toBe("empty");
@@ -265,7 +321,7 @@ describe("la cosecha no puede hacer daño", () => {
     writeFileSync(join(dir, "SKILL.md"), "---\nname: migrar-a-bun-test\ndescription: mia\n---\nMio.\n", "utf-8");
 
     const res = await harvestSkill(
-      { skillsDir, distill: async () => goodDraft },
+      { skillsDir, distill: async () => goodAnswer },
       { goal: goal(), session: session() },
     );
 
@@ -294,7 +350,7 @@ describe("la cosecha no puede hacer daño", () => {
 describe("transparencia: quien escribio la propuesta", () => {
   test("el modelo queda estampado en el frontmatter", async () => {
     await harvestSkill(
-      { skillsDir, distill: async () => goodDraft, modelLabel: "anthropic/claude-sonnet-4-5" },
+      { skillsDir, distill: async () => goodAnswer, modelLabel: "anthropic/claude-sonnet-4-5" },
       { goal: goal(), session: session() },
     );
 
@@ -304,7 +360,7 @@ describe("transparencia: quien escribio la propuesta", () => {
 
   test("SkillsManager lo expone para poder mostrarlo", async () => {
     await harvestSkill(
-      { skillsDir, distill: async () => goodDraft, modelLabel: "cortex/qwen2.5:0.5b" },
+      { skillsDir, distill: async () => goodAnswer, modelLabel: "cortex/qwen2.5:0.5b" },
       { goal: goal(), session: session() },
     );
 

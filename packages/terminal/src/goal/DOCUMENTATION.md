@@ -153,6 +153,24 @@ Adoptar = quitar la línea `status: draft` (a mano, o `wabisabi skills adopt <no
 ediciones del usuario en el cuerpo **sobreviven** a la adopción — de hecho editarlo antes de
 adoptar es el uso previsto.
 
+### El destilador NO responde en JSON
+
+Pedirle a un modelo que meta markdown multilínea dentro de un string JSON produce, de forma
+fiable, **saltos de línea literales dentro del string** — JSON inválido, y lo que se pierde es
+justo el trabajo bueno. Comprobado contra qwen2.5:7b: los casos con sustancia fallaban al parsear
+mientras los triviales (cuerpo de una línea) pasaban. La cosecha estaba **invertida**.
+
+El formato es line-based y a prueba de saltos de línea:
+
+```
+NAME: kebab-case
+DESCRIPTION: una linea
+BODY:
+<markdown libre hasta el final>
+```
+
+`parseDistillOutput` tolera además el ```fence con el que muchos modelos lo envuelven.
+
 ### Qué se cosecha y qué no
 
 - Solo objetivos `complete`, y solo con **≥2 turnos**: un objetivo de un turno no enseñó nada, y
@@ -164,6 +182,12 @@ adoptar es el uso previsto.
 - **Nunca sobrescribe** una skill existente, adoptada o borrador: puede llevar ediciones del usuario.
 - Todo el camino es best-effort: un destilador caído, una salida con la forma equivocada o un cuerpo
   trivial **no escriben nada** y **no afectan al objetivo que acaba de cumplirse**.
+
+**Limitación medida**: el mínimo de longitud y de líneas del cuerpo **no distingue sustancia de
+relleno**. Un modelo que divaga supera la barrera con una propuesta inútil. Lo que de verdad filtra
+es el mínimo de **turnos**: tras arreglar el prompt del turno headless, un objetivo trivial se
+completa en 1 turno y no llega a cosecharse. El filtro real sigue siendo el humano — por eso son
+propuestas.
 
 ### Qué modelo la escribe (y por qué se dice)
 
@@ -272,7 +296,7 @@ Detalles con consecuencias:
 
 ## Validación
 
-`bun test src/goal/` — 156 tests: orden de decisión, abort=pausa, las tres paradas duras, la
+`bun test src/goal/` — 163 tests: orden de decisión, abort=pausa, las tres paradas duras, la
 compactación no juzgada, las rachas de bloqueo y de fallo de auditoría, la contabilidad segmentada
 y monótona, y la higiene del prompt del auditor (escapado XML, recorte por el final, rechazo de
 veredictos inventados). Ninguno necesita modelo ni red.

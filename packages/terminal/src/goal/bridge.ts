@@ -55,7 +55,8 @@ export interface BridgeOptions {
 
 /** Distiller plus the label that goes into the draft, so trust is legible. */
 interface Distiller {
-  run: (prompt: string) => Promise<unknown | null>;
+  /** Raw model answer; `harvest.ts` owns the parsing. */
+  run: (prompt: string) => Promise<string | null>;
   label: string;
 }
 
@@ -103,7 +104,7 @@ export function createAgentBridge(options: BridgeOptions = {}) {
   const smallDistiller = (): Distiller => ({
     label: `cortex/${CortexConfigSchema.parse(configManager.getMerged().cortex ?? {}).model}`,
     run: async (prompt) => {
-      const res = await cortex.generateJSON<unknown>(prompt, { maxTokens: 1024 });
+      const res = await cortex.generate(prompt, { maxTokens: 1024, json: false });
       return res.ok ? res.value : null;
     },
   });
@@ -117,19 +118,7 @@ export function createAgentBridge(options: BridgeOptions = {}) {
 
       return {
         label: session.model,
-        run: async (prompt) => {
-          const text = await client.chat(
-            `${prompt}\n\nResponde SOLO con el JSON, sin texto alrededor.`,
-          );
-          // The main model has no native JSON mode here, so tolerate prose around it.
-          const match = text.match(/\{[\s\S]*\}/);
-          if (!match) return null;
-          try {
-            return JSON.parse(match[0]);
-          } catch {
-            return null;
-          }
-        },
+        run: async (prompt) => client.chat(prompt),
       };
     } catch {
       return null;
@@ -235,10 +224,33 @@ export function createAgentBridge(options: BridgeOptions = {}) {
       const merged = configManager.getMerged();
       const client = new ApiClient({ ...merged, model: session.model });
 
+      // The interactive agent gets the whole project context; a headless turn
+      // used to get one sentence, and it showed: the model chatted for turns
+      // before touching a tool because nothing told it it had any.
+      const { projectContext } = await import("../context/index.js");
+      let projectPrompt = "";
+      try {
+        await projectContext.initialize(session.projectRoot);
+        projectPrompt = projectContext.getSystemPrompt();
+      } catch {
+        // A goal must still advance without project context.
+      }
+
+      const systemPrompt = [
+        "Eres un agente de codigo trabajando de forma AUTONOMA hacia un objetivo.",
+        "Nadie puede responderte: no hagas preguntas, no pidas confirmacion.",
+        "TIENES herramientas. Usalas para comprobar los hechos en vez de suponerlos:",
+        "leer un fichero antes de describirlo no es opcional.",
+        "Si te falta una herramienta para avanzar, dilo en el parte y sigue con lo demas.",
+        projectPrompt,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
       const result = await runHeadlessTurn(
         client,
         session,
-        "Eres un agente de codigo trabajando de forma autonoma hacia un objetivo.",
+        systemPrompt,
         prompt,
         {
           policy: options.autonomousTools ?? "read-only",
