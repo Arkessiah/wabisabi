@@ -183,11 +183,38 @@ BODY:
 - Todo el camino es best-effort: un destilador caído, una salida con la forma equivocada o un cuerpo
   trivial **no escriben nada** y **no afectan al objetivo que acaba de cumplirse**.
 
-**Limitación medida**: el mínimo de longitud y de líneas del cuerpo **no distingue sustancia de
-relleno**. Un modelo que divaga supera la barrera con una propuesta inútil. Lo que de verdad filtra
-es el mínimo de **turnos**: tras arreglar el prompt del turno headless, un objetivo trivial se
-completa en 1 turno y no llega a cosecharse. El filtro real sigue siendo el humano — por eso son
-propuestas.
+### El revisor independiente
+
+La cosecha era **la única pieza del sistema sin auditor**: el mismo modelo que escribía la skill
+decidía que merecía la pena. Es la misma auto-aprobación contra la que existe el bucle de objetivo,
+y se notó — un *"mira README.md usando la tool read"* con relleno superaba cualquier heurística de
+longitud.
+
+Ahora hay un **revisor en otro modelo** (siempre el pequeño, nunca el que escribió) que además
+**no ve el objetivo**, solo el borrador: el entusiasmo por la meta no es prueba de que la skill
+enseñe algo.
+
+- **Un revisor caído NO cuenta como aprobación.** Sin revisión, una propuesta no vale la atención
+  del lector por defecto.
+- Un veredicto ilegible tampoco aprueba.
+
+**Calibración, medida contra qwen2.5:3b**: con solo ejemplos de rechazo, el revisor tumbaba también
+el trabajo bueno. Con **un ejemplo de cada lado** discrimina correctamente. Los dos ejemplos del
+prompt no son decorativos: quitarlos rompe el filtro.
+
+### Rarezas del modelo que el parser absorbe
+
+Observadas con qwen2.5:7b y cubiertas con test:
+
+- Repite el marcador `BODY:` antes del contenido.
+- Añade charla suya **después** de un fence de cierre, a veces en otro idioma.
+- Envuelve todo en un ```fence.
+
+Todo eso se recorta: lo que hay tras un fence de cierre es el modelo hablándonos, no la skill.
+
+**Lo que sigue sin resolver**: el contenido puede ser plausible y estar mal (en una prueba real el
+modelo escribió `jest.tmpDir()` en un proyecto de Bun). Ninguna heurística ni revisor local lo
+atrapa. Por eso son **propuestas que revisa un humano**, no skills.
 
 ### Qué modelo la escribe (y por qué se dice)
 
@@ -296,7 +323,7 @@ Detalles con consecuencias:
 
 ## Validación
 
-`bun test src/goal/` — 163 tests: orden de decisión, abort=pausa, las tres paradas duras, la
+`bun test src/goal/` — 173 tests: orden de decisión, abort=pausa, las tres paradas duras, la
 compactación no juzgada, las rachas de bloqueo y de fallo de auditoría, la contabilidad segmentada
 y monótona, y la higiene del prompt del auditor (escapado XML, recorte por el final, rechazo de
 veredictos inventados). Ninguno necesita modelo ni red.

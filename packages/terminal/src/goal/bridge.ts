@@ -191,6 +191,12 @@ export function createAgentBridge(options: BridgeOptions = {}) {
               get modelLabel() {
                 return usedLabel;
               },
+              // Always the small model, and never the distiller: the point is
+              // that whoever wrote it does not get to approve it.
+              judge: async (prompt) => {
+                const res = await cortex.generate(prompt, { maxTokens: 200, json: false });
+                return res.ok ? res.value : null;
+              },
               log,
             },
             { goal, session },

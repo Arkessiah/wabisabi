@@ -15,7 +15,9 @@ import {
   extractWorkSummary,
   harvestSkill,
   isWorthHarvesting,
+  buildJudgePrompt,
   parseDistillOutput,
+  parseJudgeVerdict,
   renderDraft,
   sanitizeName,
 } from "../harvest.js";
@@ -174,6 +176,21 @@ describe("parseo de la salida del destilador", () => {
   test("sin las tres marcas, se rechaza", () => {
     expect(parseDistillOutput("aqui tienes tu skill!")).toBeNull();
     expect(parseDistillOutput("NAME: x\nDESCRIPTION: y")).toBeNull();
+  });
+
+  test("se come un marcador BODY: repetido antes del contenido", () => {
+    // Observado con qwen2.5:7b: escribe BODY: dos veces.
+    const d = parseDistillOutput("NAME: a-b\nDESCRIPTION: d\nBODY:\nBODY:\n\n# Titulo\ncontenido");
+    expect(d?.body.startsWith("# Titulo")).toBe(true);
+  });
+
+  test("corta la charla del modelo despues del fence de cierre", () => {
+    // Observado: tras el contenido añadia ``` y un comentario en otro idioma.
+    const d = parseDistillOutput(
+      "NAME: a-b\nDESCRIPTION: d\nBODY:\n# Real\ncontenido util\n```\n这个格式确保了简洁性。",
+    );
+    expect(d?.body).toBe("# Real\ncontenido util");
+    expect(d?.body).not.toContain("这个");
   });
 
   test("el cuerpo puede llevar saltos de linea sin escapar (lo que rompia el JSON)", () => {
@@ -336,7 +353,7 @@ describe("la cosecha no puede hacer daño", () => {
         skillsDir,
         distill: async () => {
           llamado = true;
-          return goodDraft;
+          return goodAnswer;
         },
       },
       { goal: goal({ status: "blocked" }), session: session() },
@@ -378,6 +395,83 @@ describe("transparencia: quien escribio la propuesta", () => {
 
   test("sin etiqueta de modelo, el frontmatter no lleva la linea", () => {
     expect(renderDraft(goodDraft, goal())).not.toContain("harvested_by");
+  });
+});
+
+describe("el revisor independiente", () => {
+  const approve = async () => "VERDICT: SI\nREASON: ensena algo concreto";
+  const reject = async () => "VERDICT: NO\nREASON: son pasos obvios";
+
+  test("aprobada por el revisor, se escribe", async () => {
+    const res = await harvestSkill(
+      { skillsDir, distill: async () => goodAnswer, judge: approve },
+      { goal: goal(), session: session() },
+    );
+    expect(res.harvested).toBe(true);
+  });
+
+  test("rechazada por el revisor, NO se escribe", async () => {
+    const res = await harvestSkill(
+      { skillsDir, distill: async () => goodAnswer, judge: reject },
+      { goal: goal(), session: session() },
+    );
+
+    expect(res.harvested).toBe(false);
+    expect(res.reason).toBe("rejected-by-judge");
+    expect(res.judgeReason).toContain("obvios");
+    expect(existsSync(join(skillsDir, "migrar-a-bun-test"))).toBe(false);
+  });
+
+  test("un revisor CAIDO no cuenta como aprobacion", async () => {
+    // Sin revision, una propuesta no vale la atencion del lector por defecto.
+    const res = await harvestSkill(
+      {
+        skillsDir,
+        distill: async () => goodAnswer,
+        judge: async () => {
+          throw new Error("modelo caido");
+        },
+      },
+      { goal: goal(), session: session() },
+    );
+
+    expect(res.reason).toBe("rejected-by-judge");
+    expect(existsSync(join(skillsDir, "migrar-a-bun-test"))).toBe(false);
+  });
+
+  test("un veredicto ilegible tampoco aprueba", async () => {
+    const res = await harvestSkill(
+      { skillsDir, distill: async () => goodAnswer, judge: async () => "pues no se, quiza" },
+      { goal: goal(), session: session() },
+    );
+    expect(res.reason).toBe("rejected-by-judge");
+  });
+
+  test("el revisor NO ve el objetivo, solo el borrador", () => {
+    const p = buildJudgePrompt({ name: "x", description: "desc", body: "cuerpo" });
+    expect(p).toContain("desc");
+    expect(p).toContain("cuerpo");
+    expect(p).not.toContain("migrar los tests a bun:test");
+  });
+
+  test("se le instruye a rechazar ante la duda", () => {
+    expect(buildJudgePrompt({ name: "x", description: "d", body: "b" })).toContain("responde NO");
+  });
+
+  test("esta calibrado con un ejemplo de cada lado, no solo de rechazo", () => {
+    // Con solo ejemplos negativos rechazaba tambien el trabajo bueno (medido).
+    const p = buildJudgePrompt({ name: "x", description: "d", body: "b" });
+    expect(p).toContain("merece SI");
+    expect(p).toContain("merece NO");
+  });
+
+  test("parsea SI, NO y sus variantes", () => {
+    expect(parseJudgeVerdict("VERDICT: SI\nREASON: r")?.worth).toBe(true);
+    expect(parseJudgeVerdict("VERDICT: SÍ\nREASON: r")?.worth).toBe(true);
+    expect(parseJudgeVerdict("VERDICT: NO\nREASON: r")?.worth).toBe(false);
+    expect(parseJudgeVerdict("no entiendo la pregunta")).toBeNull();
+    // Un veredicto que no es ni si ni no tampoco vale.
+    expect(parseJudgeVerdict("VERDICT: quiza\nREASON: r")).toBeNull();
   });
 });
 
