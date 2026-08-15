@@ -118,20 +118,28 @@ export function runDaemon(
   let goalLoop: { stop: () => void } | null = null;
   void (async () => {
     try {
-      const [{ startGoalLoop }, { GoalStore }, { createAgentBridge }] = await Promise.all([
-        import("../goal/runtime.js"),
-        import("../goal/store.js"),
-        import("../goal/bridge.js"),
-      ]);
+      const [{ startGoalLoop }, { GoalStore }, { createAgentBridge }, { GoalConfigSchema }, { configManager }] =
+        await Promise.all([
+          import("../goal/runtime.js"),
+          import("../goal/store.js"),
+          import("../goal/bridge.js"),
+          import("../goal/schema.js"),
+          import("../config/index.js"),
+        ]);
+      configManager.loadGlobal();
+      const goalCfg = GoalConfigSchema.parse(configManager.getMerged().goal ?? {});
       const store = new GoalStore();
       goalLoop = startGoalLoop({
         store,
         ...createAgentBridge({
           log: (m) => logger.info(m),
           // The user must find out a skill was written on their behalf.
-          onSkillProposed: (name, path) =>
+          harvestModel: goalCfg.harvestModel,
+          harvestSkills: goalCfg.harvestSkills,
+          onSkillProposed: (name, path, modelLabel) =>
             logger.info(
-              `PROPUESTA DE SKILL "${name}" — no se carga en ningun prompt hasta adoptarla. ` +
+              `PROPUESTA DE SKILL "${name}"${modelLabel ? ` (destilada por ${modelLabel})` : ""} — ` +
+                `no se carga en ningun prompt hasta adoptarla. ` +
                 `Revisala en ${path} y luego: wabisabi skills adopt ${name}`,
             ),
         }),

@@ -291,6 +291,40 @@ describe("la cosecha no puede hacer daño", () => {
   });
 });
 
+describe("transparencia: quien escribio la propuesta", () => {
+  test("el modelo queda estampado en el frontmatter", async () => {
+    await harvestSkill(
+      { skillsDir, distill: async () => goodDraft, modelLabel: "anthropic/claude-sonnet-4-5" },
+      { goal: goal(), session: session() },
+    );
+
+    const content = readFileSync(join(skillsDir, "migrar-a-bun-test", "SKILL.md"), "utf-8");
+    expect(content).toContain("harvested_by: anthropic/claude-sonnet-4-5");
+  });
+
+  test("SkillsManager lo expone para poder mostrarlo", async () => {
+    await harvestSkill(
+      { skillsDir, distill: async () => goodDraft, modelLabel: "cortex/qwen2.5:0.5b" },
+      { goal: goal(), session: session() },
+    );
+
+    const draft = new SkillsManager(root, userDir).listDrafts()[0];
+    expect(draft?.harvestedBy).toBe("cortex/qwen2.5:0.5b");
+  });
+
+  test("una skill escrita a mano no finge tener modelo", () => {
+    const dir = join(skillsDir, "a-mano");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "SKILL.md"), "---\nname: a-mano\ndescription: mia\n---\nCuerpo.\n", "utf-8");
+
+    expect(new SkillsManager(root, userDir).list()[0]?.harvestedBy).toBeUndefined();
+  });
+
+  test("sin etiqueta de modelo, el frontmatter no lleva la linea", () => {
+    expect(renderDraft(goodDraft, goal())).not.toContain("harvested_by");
+  });
+});
+
 describe("renderDraft", () => {
   test("el frontmatter es valido y el status va siempre", () => {
     const out = renderDraft(goodDraft, goal());

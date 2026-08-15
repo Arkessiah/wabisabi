@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { CortexConfigSchema } from "../cortex/schema.js";
 import { DaemonConfigSchema } from "../daemon/schema.js";
+import { GoalConfigSchema } from "../goal/schema.js";
 
 // ── Tool Permissions ───────────────────────────────────────────
 
@@ -81,6 +82,7 @@ export const GlobalConfigSchema = z.object({
   streaming: z.boolean().default(true),
   cortex: CortexConfigSchema.optional(),
   daemon: DaemonConfigSchema.optional(),
+  goal: GoalConfigSchema.optional(),
   sessionsDir: z.string().optional(),
   profile: z
     .object({
@@ -111,3 +113,4 @@ export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
 export type MergedConfig = GlobalConfig;
 export type { CortexConfig } from "../cortex/schema.js";
 export type { DaemonConfig } from "../daemon/schema.js";
+export type { GoalConfig } from "../goal/schema.js";

@@ -19,6 +19,7 @@ import { audit as runAudit } from "./auditor.js";
 import { harvestSkill } from "./harvest.js";
 import type { TranscriptFacts } from "./tick.js";
 import type { SessionGoal } from "./schema.js";
+import type { SessionInfo } from "../session/types.js";
 
 export interface BridgeOptions {
   log?: (message: string) => void;
@@ -31,7 +32,27 @@ export interface BridgeOptions {
   /** Where harvested skill proposals land. Defaults to the project's own. */
   skillsDir?: string;
   /** Told when a proposal was written, so the user finds out. */
-  onSkillProposed?: (name: string, path: string) => void;
+  onSkillProposed?: (name: string, path: string, modelLabel?: string) => void;
+  /**
+   * Which model distills a completed goal into a skill draft.
+   *
+   * - `session` (default): the model that did the work. If the user pays for
+   *   good infrastructure — Substratum, their own API key — that is the model
+   *   worth writing with, and they already chose it.
+   * - `small`: the local helper. Nearly free, noticeably worse prose.
+   *
+   * A failed main-model call falls back to the small one rather than losing the
+   * harvest; whichever ran is stamped into the draft.
+   */
+  harvestModel?: "session" | "small";
+  /** Turn harvesting off entirely. Default on. */
+  harvestSkills?: boolean;
+}
+
+/** Distiller plus the label that goes into the draft, so trust is legible. */
+interface Distiller {
+  run: (prompt: string) => Promise<unknown | null>;
+  label: string;
 }
 
 /** Built inline: the objective is untrusted user data, so it is XML-escaped. */
@@ -75,6 +96,42 @@ export function createAgentBridge(options: BridgeOptions = {}) {
       return new CortexClient(CortexConfigSchema.parse(merged.cortex ?? {}));
     })();
 
+  const smallDistiller = (): Distiller => ({
+    label: `cortex/${CortexConfigSchema.parse(configManager.getMerged().cortex ?? {}).model}`,
+    run: async (prompt) => {
+      const res = await cortex.generateJSON<unknown>(prompt, { maxTokens: 1024 });
+      return res.ok ? res.value : null;
+    },
+  });
+
+  /** The session's own model, through the normal provider chain. */
+  const sessionDistiller = async (session: SessionInfo): Promise<Distiller | null> => {
+    try {
+      const { ApiClient } = await import("../clients/api-client.js");
+      const merged = configManager.getMerged();
+      const client = new ApiClient({ ...merged, model: session.model });
+
+      return {
+        label: session.model,
+        run: async (prompt) => {
+          const text = await client.chat(
+            `${prompt}\n\nResponde SOLO con el JSON, sin texto alrededor.`,
+          );
+          // The main model has no native JSON mode here, so tolerate prose around it.
+          const match = text.match(/\{[\s\S]*\}/);
+          if (!match) return null;
+          try {
+            return JSON.parse(match[0]);
+          } catch {
+            return null;
+          }
+        },
+      };
+    } catch {
+      return null;
+    }
+  };
+
   return {
     readFacts: async (goal: SessionGoal): Promise<TranscriptFacts> => {
       const session = await storage.load(goal.sessionId);
@@ -113,17 +170,33 @@ export function createAgentBridge(options: BridgeOptions = {}) {
     onSettled: (goal: SessionGoal, reason: string): void => {
       void reason;
       if (goal.status !== "complete") return;
+      if (options.harvestSkills === false) return;
       void (async () => {
         try {
           const session = await storage.load(goal.sessionId);
           if (!session) return;
 
+          const preferSmall = options.harvestModel === "small";
+          const primary = preferSmall ? smallDistiller() : await sessionDistiller(session);
+          const chosen = primary ?? smallDistiller();
+
+          let usedLabel = chosen.label;
           const result = await harvestSkill(
             {
               skillsDir: options.skillsDir ?? join(session.projectRoot, ".agents", "skills"),
               distill: async (prompt) => {
-                const res = await cortex.generateJSON<unknown>(prompt, { maxTokens: 1024 });
-                return res.ok ? res.value : null;
+                const out = await chosen.run(prompt);
+                if (out !== null || preferSmall) return out;
+                // Losing the harvest because the main model hiccupped would be a
+                // waste; the small one is worse but it is not nothing, and the
+                // draft says which one wrote it.
+                log(`destilacion con ${chosen.label} fallida; reintento con el modelo pequeno`);
+                const fallback = smallDistiller();
+                usedLabel = fallback.label;
+                return fallback.run(prompt);
+              },
+              get modelLabel() {
+                return usedLabel;
               },
               log,
             },
@@ -131,7 +204,7 @@ export function createAgentBridge(options: BridgeOptions = {}) {
           );
 
           if (result.harvested && result.name && result.path) {
-            options.onSkillProposed?.(result.name, result.path);
+            options.onSkillProposed?.(result.name, result.path, result.modelLabel);
           }
         } catch (error) {
           log(`cosecha de skill fallida (no afecta al objetivo): ${String(error)}`);

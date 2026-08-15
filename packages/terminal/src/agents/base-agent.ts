@@ -242,6 +242,9 @@ export abstract class BaseAgent {
           for (const d of drafts) {
             head += `  ${chalk.yellow(d.name.padEnd(28))} ${chalk.dim(d.description.slice(0, 46))}\n`;
             head += chalk.dim(`  ${" ".repeat(28)} ${d.path}\n`);
+            if (d.harvestedBy) {
+              head += chalk.dim(`  ${" ".repeat(28)} destilada por: ${d.harvestedBy}\n`);
+            }
           }
           head += chalk.dim("\n  No se cargan en ningun prompt hasta que las adoptes.\n");
           head += chalk.dim("  Revisalas, editalas, y luego: wabisabi skills adopt <nombre>\n");

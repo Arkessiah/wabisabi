@@ -125,7 +125,7 @@ function escapeXml(text: string): string {
  * `status: draft` is what keeps it out of every model-facing path, so it is
  * written unconditionally here rather than left to the caller.
  */
-export function renderDraft(draft: SkillDraft, goal: SessionGoal): string {
+export function renderDraft(draft: SkillDraft, goal: SessionGoal, modelLabel?: string): string {
   const body = draft.body.slice(0, MAX_BODY_CHARS).trim();
 
   return [
@@ -134,6 +134,7 @@ export function renderDraft(draft: SkillDraft, goal: SessionGoal): string {
     `description: ${draft.description.replace(/\n/g, " ").slice(0, 1024)}`,
     "status: draft",
     `harvested_from_session: ${goal.sessionId}`,
+    ...(modelLabel ? [`harvested_by: ${modelLabel.replace(/\n/g, " ").slice(0, 120)}`] : []),
     "---",
     "",
     "<!--",
@@ -153,6 +154,8 @@ export interface HarvestResult {
   reason?: "not-worth-it" | "distill-failed" | "empty" | "bad-name" | "exists" | "write-failed";
   name?: string;
   path?: string;
+  /** Which model produced it, when known. */
+  modelLabel?: string;
 }
 
 export interface HarvestDeps {
@@ -160,6 +163,13 @@ export interface HarvestDeps {
   skillsDir: string;
   /** Asks a model to distill. Returns null when it could not. */
   distill: (prompt: string) => Promise<unknown | null>;
+  /**
+   * Which model wrote it, stamped into the draft.
+   * Not cosmetic: a proposal from a 0.5B helper and one from the user's main
+   * model deserve very different amounts of trust, and the reader cannot tell
+   * them apart from the prose alone.
+   */
+  modelLabel?: string;
   log?: (message: string) => void;
 }
 
@@ -204,15 +214,18 @@ export async function harvestSkill(
 
   try {
     mkdirSync(dir, { recursive: true });
-    atomicWriteFileSync(path, renderDraft({ ...raw, name }, context.goal), {
+    atomicWriteFileSync(path, renderDraft({ ...raw, name }, context.goal, deps.modelLabel), {
       encoding: "utf-8",
     });
   } catch {
     return { harvested: false, reason: "write-failed", name };
   }
 
-  deps.log?.(`propuesta de skill "${name}" escrita en ${path}`);
-  return { harvested: true, name, path };
+  deps.log?.(
+    `propuesta de skill "${name}" escrita en ${path}` +
+      (deps.modelLabel ? ` (destilada por ${deps.modelLabel})` : ""),
+  );
+  return { harvested: true, name, path, modelLabel: deps.modelLabel };
 }
 
 /**

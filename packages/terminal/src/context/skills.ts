@@ -48,6 +48,8 @@ export interface SkillMeta {
   scope: SkillScope;
   path: string;
   triggers: string[];
+  /** Model that distilled it, when it was harvested. Absent for hand-written skills. */
+  harvestedBy?: string;
   /**
    * Harvested from a completed goal and NOT yet adopted by the user.
    * A draft is never indexed, never auto-loaded and never returned by the
@@ -223,6 +225,7 @@ export class SkillsManager {
       scope,
       path,
       draft: (parsed.data.status ?? "").trim().toLowerCase() === "draft",
+      ...(parsed.data.harvested_by ? { harvestedBy: parsed.data.harvested_by } : {}),
       triggers: explicit?.length ? explicit : deriveTriggers(name, description),
     };
   }

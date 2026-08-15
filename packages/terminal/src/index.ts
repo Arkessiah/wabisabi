@@ -864,6 +864,7 @@ program
       for (const d of drafts) {
         console.log(`   ${d.name}  —  ${d.description.slice(0, 60)}`);
         console.log(`      ${d.path}`);
+        if (d.harvestedBy) console.log(`      destilada por: ${d.harvestedBy}`);
       }
       console.log("\n   Revisalas y edita lo que quieras; luego: wabisabi skills adopt <nombre>\n");
     }

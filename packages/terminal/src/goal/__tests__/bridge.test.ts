@@ -51,9 +51,11 @@ async function saveSession(messages: SessionInfo["messages"]): Promise<void> {
 }
 
 function stubCortex(body: unknown): CortexClient {
-  // @ts-expect-error -- deliberate test double
-  globalThis.fetch = () =>
-    Promise.resolve(new Response(JSON.stringify({ response: JSON.stringify(body) }), { status: 200 }));
+  // Deliberate test double.
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(JSON.stringify({ response: JSON.stringify(body) }), { status: 200 }),
+    )) as unknown as typeof fetch;
   return new CortexClient(CortexConfigSchema.parse({ model: "m", timeout: 200 }));
 }
 

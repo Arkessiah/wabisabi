@@ -163,6 +163,29 @@ adoptar es el uso previsto.
 - Todo el camino es best-effort: un destilador caído, una salida con la forma equivocada o un cuerpo
   trivial **no escriben nada** y **no afectan al objetivo que acaba de cumplirse**.
 
+### Qué modelo la escribe (y por qué se dice)
+
+`goal.harvestModel` en `config.jsonc`:
+
+| Valor | Modelo | Coste | Calidad |
+|---|---|---|---|
+| `session` (**default**) | el que hizo el trabajo | el de la sesión | la buena |
+| `small` | cortex local | casi cero | prosa notablemente peor |
+
+El default es `session` a propósito: **si el usuario paga buena infraestructura —Substratum, su
+propia key— ese es el modelo con el que merece la pena escribir**, y además ya lo eligió él.
+Juzgar `continue/complete/blocked` le sobra a un 0.5B; redactar una skill decente es otra liga.
+
+Si la llamada al modelo principal falla, se reintenta con el pequeño en vez de perder la cosecha:
+peor prosa no es nada, y el borrador dice cuál la escribió.
+
+**Transparencia**: el frontmatter lleva `harvested_by: <modelo>`, y tanto `/skills` como
+`wabisabi skills` lo muestran. No es cosmético — una propuesta de un ayudante de 0.5B y una del
+modelo principal del usuario merecen confianzas muy distintas, y **eso no se deduce de la prosa**.
+Una skill escrita a mano no lleva la línea.
+
+`goal.harvestSkills: false` desactiva la cosecha entera.
+
 ### Cómo se entera el usuario
 
 - El daemon lo registra en su log de forma explícita, con la ruta y el comando para adoptarla.
@@ -178,7 +201,7 @@ adoptar es el uso previsto.
 
 ## Validación
 
-`bun test src/goal/` — 116 tests: orden de decisión, abort=pausa, las tres paradas duras, la
+`bun test src/goal/` — 120 tests: orden de decisión, abort=pausa, las tres paradas duras, la
 compactación no juzgada, las rachas de bloqueo y de fallo de auditoría, la contabilidad segmentada
 y monótona, y la higiene del prompt del auditor (escapado XML, recorte por el final, rechazo de
 veredictos inventados). Ninguno necesita modelo ni red.

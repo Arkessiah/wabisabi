@@ -66,6 +66,21 @@ export const SessionGoalSchema = z.object({
 
 export type SessionGoal = z.infer<typeof SessionGoalSchema>;
 
+export const GoalConfigSchema = z.object({
+  /**
+   * Which model distills a completed goal into a skill proposal.
+   * `session` uses the model that did the work — if the user pays for good
+   * infrastructure, that is the one worth writing with. `small` uses the local
+   * helper: nearly free, noticeably worse prose. Either way the draft records
+   * which one wrote it.
+   */
+  harvestModel: z.enum(["session", "small"]).default("session"),
+  /** Harvest a skill proposal when a goal completes. */
+  harvestSkills: z.boolean().default(true),
+});
+
+export type GoalConfig = z.infer<typeof GoalConfigSchema>;
+
 /** What the auditor returns. */
 export interface AuditResult {
   verdict: GoalVerdict;
