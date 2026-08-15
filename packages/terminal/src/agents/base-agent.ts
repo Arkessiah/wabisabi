@@ -147,6 +147,7 @@ export abstract class BaseAgent {
             "  /status           Show current status\n" +
             "  /tools            List available tools\n" +
             "  /skills           List project skills\n" +
+            "  /goal [texto]     Set/see the session goal (pause|resume|clear)\n" +
             "  /approve          Toggle auto-approve for tools\n" +
             "  /compact          Smart compact conversation history\n" +
             "  /export [file]    Export conversation to markdown\n" +
@@ -229,6 +230,70 @@ export abstract class BaseAgent {
           }
         }
         this.io.writeOutput(output);
+        return true;
+      }
+
+      case "goal": {
+        const { GoalStore } = await import("../goal/store.js");
+        const {
+          createGoal, pauseGoal, resumeGoalAction, clearGoal, describeGoal,
+        } = await import("../goal/actions.js");
+
+        const store = new GoalStore();
+        const current = sessionManager.getCurrent();
+        if (!current) {
+          this.io.writeOutput(chalk.dim("\n  No hay sesion activa.\n"));
+          return true;
+        }
+
+        const sub = parts[1];
+        const rest = parts.slice(1).join(" ").trim();
+
+        // No argument: show status.
+        if (!sub) {
+          const goal = store.get(current.id);
+          if (!goal) {
+            this.io.writeOutput(
+              chalk.dim("\n  Sin objetivo. Crea uno con: /goal <que quieres conseguir>\n"),
+            );
+            return true;
+          }
+          let out = chalk.bold("\n  Objetivo\n");
+          out += `  ${describeGoal(goal)}\n`;
+          if (goal.note) out += chalk.dim(`  Auditor: ${goal.note}\n`);
+          out += chalk.dim("\n  /goal pause | /goal resume | /goal clear\n");
+          this.io.writeOutput(out);
+          return true;
+        }
+
+        if (sub === "pause" || sub === "resume" || sub === "clear") {
+          const res =
+            sub === "pause" ? pauseGoal(store, current.id)
+            : sub === "resume" ? resumeGoalAction(store, current.id)
+            : clearGoal(store, current.id);
+
+          if (!res.ok) {
+            this.io.writeOutput(chalk.yellow(`\n  ${res.error}\n`));
+            return true;
+          }
+          this.io.writeOutput(
+            chalk.green(`\n  Objetivo ${sub === "clear" ? "borrado" : sub === "pause" ? "pausado" : "reanudado"}.\n`),
+          );
+          return true;
+        }
+
+        // Anything else is the objective itself.
+        const res = createGoal(store, { session: current, objective: rest });
+        if (!res.ok) {
+          this.io.writeOutput(chalk.yellow(`\n  ${res.error}\n`));
+          return true;
+        }
+
+        let out = chalk.green("\n  Objetivo fijado.\n");
+        if (res.note) out += chalk.dim(`  ${res.note}\n`);
+        out += chalk.dim("  El daemon lo continuara solo si esta activo (wabisabi daemon status).\n");
+        out += chalk.dim("  Sin daemon, el objetivo queda guardado pero nadie lo empuja.\n");
+        this.io.writeOutput(out);
         return true;
       }
 

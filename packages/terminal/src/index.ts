@@ -828,6 +828,91 @@ program
   });
 
 program
+  .command("goal [action] [text...]")
+  .description("🎯 Session goals: list, show, set, pause, resume, clear")
+  .option("-s, --session <id>", "Target session (defaults to the most recent)")
+  .option("-b, --budget <tokens>", "Token budget for the goal")
+  .action(async (action: string = "list", text: string[] = [], options: { session?: string; budget?: string }) => {
+    const { GoalStore } = await import("./goal/store.js");
+    const { createGoal, pauseGoal, resumeGoalAction, clearGoal, describeGoal } =
+      await import("./goal/actions.js");
+    const { SessionStorage } = await import("./session/storage.js");
+
+    const store = new GoalStore();
+    const storage = new SessionStorage();
+
+    if (action === "list") {
+      const goals = store.list();
+      if (goals.length === 0) {
+        console.log("🎯 No hay objetivos. Crea uno desde el REPL con /goal, o: wabisabi goal set \"...\"");
+        return;
+      }
+      console.log("🎯 Objetivos:");
+      for (const g of goals) console.log(`   ${g.sessionId}  ${describeGoal(g)}`);
+      return;
+    }
+
+    // Every other action needs a target session.
+    const sessionId =
+      options.session ??
+      (await storage.list()).sort((a, b) => b.updated - a.updated)[0]?.id;
+
+    if (!sessionId) {
+      console.error("❌ No se pudo determinar la sesion. Usa --session <id>.");
+      process.exitCode = 1;
+      return;
+    }
+
+    if (action === "show") {
+      const goal = store.get(sessionId);
+      console.log(goal ? `🎯 ${describeGoal(goal)}` : "🎯 Esa sesion no tiene objetivo.");
+      if (goal?.note) console.log(`   Auditor: ${goal.note}`);
+      return;
+    }
+
+    if (action === "set") {
+      const session = await storage.load(sessionId);
+      if (!session) {
+        console.error(`❌ La sesion ${sessionId} no existe.`);
+        process.exitCode = 1;
+        return;
+      }
+      const res = createGoal(store, {
+        session,
+        objective: text.join(" "),
+        ...(options.budget ? { tokenBudget: Number(options.budget) } : {}),
+      });
+      if (!res.ok) {
+        console.error(`❌ ${res.error}`);
+        process.exitCode = 1;
+        return;
+      }
+      console.log(`🎯 Objetivo fijado en ${sessionId}.`);
+      if (res.note) console.log(`   ${res.note}`);
+      console.log("   Lo continuara el daemon si esta activo: wabisabi daemon status");
+      return;
+    }
+
+    if (action === "pause" || action === "resume" || action === "clear") {
+      const res =
+        action === "pause" ? pauseGoal(store, sessionId)
+        : action === "resume" ? resumeGoalAction(store, sessionId)
+        : clearGoal(store, sessionId);
+
+      if (!res.ok) {
+        console.error(`❌ ${res.error}`);
+        process.exitCode = 1;
+        return;
+      }
+      console.log(`🎯 Objetivo ${action === "clear" ? "borrado" : action === "pause" ? "pausado" : "reanudado"}.`);
+      return;
+    }
+
+    console.error(`❌ Accion desconocida: ${action}. Usa list|show|set|pause|resume|clear.`);
+    process.exitCode = 1;
+  });
+
+program
   .command("skills [action] [name]")
   .description("🧩 Project skills: list, and adopt harvested proposals")
   .action(async (action: string = "list", name?: string) => {

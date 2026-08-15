@@ -20,6 +20,7 @@ terminal cerrada.
 - `bridge.ts` — ata `readFacts` / `audit` / `dispatch` a la sesión, cortex y el agente.
 - `harvest.ts` — destila un objetivo cumplido en una **propuesta** de skill.
 - `headless.ts` — ejecuta un turno de agente sin nadie mirando.
+- `actions.ts` — crear, pausar, reanudar y borrar. Único camino para el REPL y la CLI.
 
 `tick.ts` no hace I/O, no llama al modelo, no toca el reloj. Todo lo sutil de un bucle autónomo
 vive ahí precisamente para poder probarlo exhaustivamente sin ejecutar nada.
@@ -230,17 +231,48 @@ Otras protecciones:
 - El turno se **persiste en la sesión** (con su `usage`). Sin eso el siguiente tick releería un
   transcript sin cambios y el bucle nunca vería su propio trabajo.
 
+## Comandos
+
+En el REPL:
+
+```
+/goal <texto>     fija el objetivo de la sesion actual
+/goal             muestra estado y nota del auditor
+/goal pause | /goal resume | /goal clear
+```
+
+Fuera del REPL:
+
+```bash
+wabisabi goal list                       # objetivos de todas las sesiones
+wabisabi goal show [--session <id>]
+wabisabi goal set "..." [--budget 50000] # por defecto, la sesion mas reciente
+wabisabi goal pause | resume | clear
+```
+
+**El bucle nunca crea un objetivo por su cuenta**: solo lee intención del disco. Un bucle autónomo
+que además decidiera en qué trabajar no respondería ante nadie.
+
+Detalles con consecuencias:
+
+- **Crear fija un `tokensBaseline`** con lo que la conversación ya costaba. Sin eso, el primer tick
+  facturaría la sesión entera anterior contra el presupuesto del objetivo.
+- **Reemplazar genera un id nuevo**, que es justo lo que invalida las escrituras de un tick que
+  seguía corriendo con el objetivo viejo.
+- Un objetivo que **excede el límite se rechaza, no se recorta**: recortarlo cambiaría en silencio
+  lo que juzga el auditor.
+- Un objetivo **cumplido no se reanuda** — se crea uno nuevo.
+- Al fijarlo se avisa de que **sin daemon activo el objetivo queda guardado pero nadie lo empuja**.
+
 ## Lo que falta
 
-- **Comandos de usuario** (`/goal`, `wabisabi goal ...`) para crear, pausar y reanudar objetivos.
-  Hoy el bucle funciona pero no hay forma cómoda de darle un objetivo.
 - Notificación al asentar con la UI cerrada (más allá del log del daemon).
 - **Sin probar de extremo a extremo con un modelo real**: cada pieza tiene tests, y el daemon
   arranca el bucle, pero no se ha visto un objetivo completarse contra un LLM de verdad.
 
 ## Validación
 
-`bun test src/goal/` — 138 tests: orden de decisión, abort=pausa, las tres paradas duras, la
+`bun test src/goal/` — 156 tests: orden de decisión, abort=pausa, las tres paradas duras, la
 compactación no juzgada, las rachas de bloqueo y de fallo de auditoría, la contabilidad segmentada
 y monótona, y la higiene del prompt del auditor (escapado XML, recorte por el final, rechazo de
 veredictos inventados). Ninguno necesita modelo ni red.
