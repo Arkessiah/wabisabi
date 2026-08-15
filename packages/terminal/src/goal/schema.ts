@@ -77,6 +77,17 @@ export const GoalConfigSchema = z.object({
   harvestModel: z.enum(["session", "small"]).default("session"),
   /** Harvest a skill proposal when a goal completes. */
   harvestSkills: z.boolean().default(true),
+  /**
+   * What an UNATTENDED turn may do.
+   *
+   * `read-only` (default): `write`, `edit` and `bash` are withheld. Enabling
+   * `allowBash` was consent given **with a confirmation prompt in front of you**,
+   * one call at a time; it is not consent for a loop to run shell commands while
+   * you sleep. `inherit` is that second, separate decision.
+   */
+  autonomousTools: z.enum(["read-only", "inherit"]).default("read-only"),
+  /** Tool-call iterations allowed inside a single unattended turn. */
+  maxTurnIterations: z.number().int().min(1).max(50).default(10),
 });
 
 export type GoalConfig = z.infer<typeof GoalConfigSchema>;

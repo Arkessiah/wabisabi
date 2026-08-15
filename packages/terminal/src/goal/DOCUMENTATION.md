@@ -19,6 +19,7 @@ terminal cerrada.
 - `facts.ts` — traduce un transcript real al snapshot que consume `decide()`.
 - `bridge.ts` — ata `readFacts` / `audit` / `dispatch` a la sesión, cortex y el agente.
 - `harvest.ts` — destila un objetivo cumplido en una **propuesta** de skill.
+- `headless.ts` — ejecuta un turno de agente sin nadie mirando.
 
 `tick.ts` no hace I/O, no llama al modelo, no toca el reloj. Todo lo sutil de un bucle autónomo
 vive ahí precisamente para poder probarlo exhaustivamente sin ejecutar nada.
@@ -192,16 +193,54 @@ Una skill escrita a mano no lleva la línea.
 - `/skills` en el REPL y `wabisabi skills` listan las propuestas pendientes **antes** que las
   activas, diciendo que no se cargan en ningún prompt.
 
+## Turnos sin supervisión (`headless.ts`)
+
+Es lo que permite que el objetivo avance con la terminal cerrada. Y es donde estaba el problema
+de seguridad más serio de todo esto.
+
+**En modo interactivo, `write`, `edit` y `bash` están protegidos por una confirmación que vive en
+el AGENTE, no en el tool.** Un ejecutor headless que llamase al registry directamente se la
+saltaría entera y correría con lo que digan `allowFileWrite` / `allowBash`.
+
+Eso sería traicionar el consentimiento: quien activó `allowBash` lo hizo **con un prompt delante,
+llamada a llamada**. No es lo mismo que autorizar a un bucle a lanzar comandos de shell a las 3 de
+la mañana. Son dos decisiones distintas, y la segunda hay que pedirla aparte.
+
+Por eso los turnos headless tienen **política propia**:
+
+| `goal.autonomousTools` | Efecto |
+|---|---|
+| `read-only` (**default**) | `write`, `edit` y `bash` **ni se le ofrecen al modelo** |
+| `inherit` | conjunto completo: el usuario acepta escrituras y shell sin supervisión |
+
+Retirar la tool es más fuerte que rechazarla después: **el modelo no puede pedir lo que no se le
+da**. Si aun así la pide (porque la conoce), se le responde que no está disponible y que **no la
+reintente**, para que informe del bloqueo en vez de gastar iteraciones.
+
+Otras protecciones:
+
+- Tope de iteraciones de tool-calling por turno (`maxTurnIterations`, 10).
+- **Nunca lanza**: un proveedor caído, una respuesta sin mensaje o un abort vuelven en `stoppedBy`,
+  porque el bucle tiene que registrar qué pasó, no tumbar el daemon.
+- **Registro de tools vacío = error explícito.** `toToolSpecs` descarta en silencio los ids que no
+  conoce, así que un registry sin poblar daría cero herramientas y el modelo se limitaría a hablar:
+  un turno que parece exitoso y no hace nada.
+- Los mensajes `tool` del historial **no se replayean**: sus resultados ya están resumidos en los
+  turnos del asistente, y repetirlos reventaría el contexto de un objetivo largo.
+- El turno se **persiste en la sesión** (con su `usage`). Sin eso el siguiente tick releería un
+  transcript sin cambios y el bucle nunca vería su propio trabajo.
+
 ## Lo que falta
 
-- **El ejecutor de turnos headless** (`runTurn`): ejecutar un turno de agente sin TUI. Es la última
-  pieza; todo lo demás está conectado y corriendo.
-- Comandos de usuario (`/goal`, `wabisabi goal ...`) para crear, pausar y reanudar objetivos.
-- Notificación al asentar con la UI cerrada.
+- **Comandos de usuario** (`/goal`, `wabisabi goal ...`) para crear, pausar y reanudar objetivos.
+  Hoy el bucle funciona pero no hay forma cómoda de darle un objetivo.
+- Notificación al asentar con la UI cerrada (más allá del log del daemon).
+- **Sin probar de extremo a extremo con un modelo real**: cada pieza tiene tests, y el daemon
+  arranca el bucle, pero no se ha visto un objetivo completarse contra un LLM de verdad.
 
 ## Validación
 
-`bun test src/goal/` — 120 tests: orden de decisión, abort=pausa, las tres paradas duras, la
+`bun test src/goal/` — 138 tests: orden de decisión, abort=pausa, las tres paradas duras, la
 compactación no juzgada, las rachas de bloqueo y de fallo de auditoría, la contabilidad segmentada
 y monótona, y la higiene del prompt del auditor (escapado XML, recorte por el final, rechazo de
 veredictos inventados). Ninguno necesita modelo ni red.

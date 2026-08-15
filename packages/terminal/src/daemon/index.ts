@@ -136,6 +136,8 @@ export function runDaemon(
           // The user must find out a skill was written on their behalf.
           harvestModel: goalCfg.harvestModel,
           harvestSkills: goalCfg.harvestSkills,
+          autonomousTools: goalCfg.autonomousTools,
+          maxTurnIterations: goalCfg.maxTurnIterations,
           onSkillProposed: (name, path, modelLabel) =>
             logger.info(
               `PROPUESTA DE SKILL "${name}"${modelLabel ? ` (destilada por ${modelLabel})` : ""} — ` +

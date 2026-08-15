@@ -173,12 +173,12 @@ describe("audit sobre el ultimo turno real", () => {
   });
 });
 
-describe("dispatch sin ejecutor", () => {
-  test("falla ruidosamente en vez de fingir que continuo", async () => {
+describe("dispatch", () => {
+  test("sin sesion, falla ruidosamente en vez de fingir que continuo", async () => {
     const bridge = createAgentBridge({ storage, cortex: stubCortex({}) });
-    // Un dispatch que no hace nada dejaria al bucle contando continuaciones
-    // que nunca ocurrieron y quemando el presupuesto de turnos en silencio.
-    await expect(bridge.dispatch(goal())).rejects.toThrow("ejecutor de turnos");
+    // Un dispatch que resolviera en silencio dejaria al bucle contando
+    // continuaciones que nunca ocurrieron y quemando el presupuesto de turnos.
+    await expect(bridge.dispatch(goal({ sessionId: "fantasma" }))).rejects.toThrow("no existe");
   });
 
   test("con ejecutor, recibe el objetivo y el prompt", async () => {

@@ -47,6 +47,10 @@ export interface BridgeOptions {
   harvestModel?: "session" | "small";
   /** Turn harvesting off entirely. Default on. */
   harvestSkills?: boolean;
+  /** What an unattended turn may do. Default `read-only`. */
+  autonomousTools?: "read-only" | "inherit";
+  /** Tool-call iterations inside one unattended turn. */
+  maxTurnIterations?: number;
 }
 
 /** Distiller plus the label that goes into the draft, so trust is legible. */
@@ -214,12 +218,62 @@ export function createAgentBridge(options: BridgeOptions = {}) {
 
     dispatch: async (goal: SessionGoal): Promise<void> => {
       const prompt = buildContinuationPrompt(goal);
-      if (!options.runTurn) {
-        throw new Error(
-          "no hay ejecutor de turnos configurado: el daemon no puede continuar el objetivo",
-        );
+
+      if (options.runTurn) {
+        await options.runTurn(goal, prompt);
+        return;
       }
-      await options.runTurn(goal, prompt);
+
+      const session = await storage.load(goal.sessionId);
+      if (!session) throw new Error(`la sesion ${goal.sessionId} no existe`);
+
+      const [{ runHeadlessTurn }, { ApiClient }] = await Promise.all([
+        import("./headless.js"),
+        import("../clients/api-client.js"),
+      ]);
+
+      const merged = configManager.getMerged();
+      const client = new ApiClient({ ...merged, model: session.model });
+
+      const result = await runHeadlessTurn(
+        client,
+        session,
+        "Eres un agente de codigo trabajando de forma autonoma hacia un objetivo.",
+        prompt,
+        {
+          policy: options.autonomousTools ?? "read-only",
+          maxIterations: options.maxTurnIterations,
+          log,
+        },
+      );
+
+      if (result.stoppedBy === "error") {
+        throw new Error(result.error ?? "el turno headless fallo");
+      }
+
+      // Persisted so the next tick can read the turn, audit it and price it.
+      // Without this the loop would re-read an unchanged transcript and never
+      // see its own work.
+      const content =
+        result.content ||
+        (result.withheld.length > 0
+          ? `Error: sin permisos para ${[...new Set(result.withheld)].join(", ")} en ejecucion autonoma.`
+          : "Error: el turno autonomo termino sin respuesta.");
+
+      session.messages.push({ role: "user", content: prompt, timestamp: Date.now() });
+      session.messages.push({
+        role: "assistant",
+        content,
+        timestamp: Date.now(),
+        ...(result.usage ? { usage: result.usage } : {}),
+      });
+      session.updated = Date.now();
+      await storage.save(session);
+
+      log(
+        `turno autonomo de ${goal.sessionId}: ${result.toolCalls} tools, ` +
+          `${result.iterations} iteraciones, fin=${result.stoppedBy}`,
+      );
     },
   };
 }
