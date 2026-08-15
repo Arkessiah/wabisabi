@@ -23,6 +23,11 @@ wabisabi privacy --show             # Ver nivel de privacidad
 wabisabi plugin --list              # Ver plugins
 wabisabi menu                       # Menú de configuración
 wabisabi info                       # Info del sistema
+wabisabi goal list                  # Objetivos de todas las sesiones
+wabisabi goal set "..."             # Fijar objetivo (--budget, --session)
+wabisabi skills                     # Skills activas y propuestas pendientes
+wabisabi skills adopt <nombre>      # Adoptar una propuesta cosechada
+wabisabi daemon status              # Proceso de fondo (opt-in)
 wabisabi shortcuts                  # Atajos de teclado
 ```
 
@@ -46,6 +51,7 @@ wabisabi shortcuts                  # Atajos de teclado
 /status           Estado completo (tokens, contexto, perfil)
 /tools            Listar herramientas disponibles
 /skills           Listar skills del proyecto (y avisos de las malformadas)
+/goal [texto]     Fijar/ver el objetivo de la sesión (pause|resume|clear)
 /approve          Toggle auto-approve para tools destructivos
 /compact          Compactar historial de conversación
 /export [file]    Exportar conversación a markdown
