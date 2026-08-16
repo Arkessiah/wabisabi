@@ -50,20 +50,24 @@ como resultado.
 
 `checkPermission` lee la config **mergeada** (global + proyecto) en cada llamada, no cacheada.
 
-### Hueco conocido (pendiente de decisión de producto)
+### Toda tool registrada está mapeada (y hay un test que lo exige)
 
-`checkPermission` **devuelve `true` cuando el id no está en el mapa**. Hoy quedan sin puerta:
+`checkPermission` devuelve `true` para cualquier id **que no esté en el mapa**: una tool nueva sin
+entrada corre **sin puerta** y nadie se entera. Por eso `__tests__/permissions.test.ts` comprueba
+que toda tool registrada tiene entrada, y que toda clave del mapa existe en el esquema.
 
-- **`git`** — 16 subcomandos, incluidos `commit`, `push`, `reset` y `checkout`. Es la tool con
-  más capacidad destructiva después de `bash` y actualmente no la limita ningún permiso.
-- **`web`** — hace peticiones de red salientes; no la cubre ningún flag de permiso (el nivel de
-  privacidad sí debería gobernarla).
-- `update_plan` / `update_todo` — escriben `PLAN.md` / `TODO.md` sin pasar por `allowFileWrite`.
+`git`, `web`, `update_plan` y `update_todo` ya tienen la suya (`allowGit`, `allowWeb`,
+`allowPlanWrite`). Sus **defaults son `true`**: ya corrían sin restricción, y apagarlas por sorpresa
+rompería configuraciones que hoy funcionan. Lo que aportan las claves es poder apagarlas.
 
-No se ha cambiado el comportamiento: cerrar estos huecos altera lo que el agente puede hacer y
-es una decisión de producto del usuario, no del código. Si se decide cerrarlos, el cambio es
-añadir entradas al mapa **y** definir los defaults, porque un default restrictivo rompe flujos
-que hoy funcionan.
+### Una clave ausente es DESCONOCIDA, no denegada
+
+Si el `config.jsonc` del usuario se escribió antes de que existiera una clave, o algo reemplaza el
+objeto `tools` entero, la clave no está. Tratar eso como `false` **apaga en silencio una tool que
+funcionaba**. Se resuelve al default del esquema.
+
+Pasó de verdad al añadir estas tres: un `configManager.update("tools", {...})` con las seis claves
+antiguas dejó `git` denegado y tumbó 9 tests. El fallo no era del test.
 
 ## Validación de rutas
 

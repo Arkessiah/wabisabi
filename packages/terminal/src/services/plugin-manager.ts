@@ -53,8 +53,15 @@ export class PluginManager {
   private stateFile: string;
   private configDir: string;
 
-  constructor() {
-    this.configDir = path.join(os.homedir(), ".wabisabi");
+  /**
+   * @param configDir  base directory; injectable so tests stay hermetic.
+   *
+   * It used to resolve `homedir()` internally, which meant no test could isolate
+   * it: every test file wrote into the user's real `~/.wabisabi/plugins`, and
+   * runs that passed alone failed together. The default keeps the old behaviour.
+   */
+  constructor(configDir: string = path.join(os.homedir(), ".wabisabi")) {
+    this.configDir = configDir;
     this.pluginsDir = path.join(this.configDir, "plugins");
     this.stateFile = path.join(this.configDir, "plugins.json");
     this.ensureDirectories();

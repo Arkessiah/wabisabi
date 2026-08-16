@@ -12,6 +12,16 @@ import { GoalConfigSchema } from "../goal/schema.js";
 
 // ── Tool Permissions ───────────────────────────────────────────
 
+/**
+ * Every registered tool MUST map to a key here.
+ * `checkPermission` returns true for any tool it does not know, so an unmapped
+ * tool runs with no gate at all — the failure is silent, which is why the
+ * mapping is asserted by a test instead of trusted.
+ *
+ * Defaults preserve today's behaviour: these tools already ran unrestricted, and
+ * flipping them off by surprise would break working setups. What the new keys
+ * buy is the ability to turn them off, plus the audit trail of them existing.
+ */
 export const ToolPermissionsSchema = z.object({
   allowFileRead: z.boolean().default(true),
   allowFileWrite: z.boolean().default(false),
@@ -19,6 +29,12 @@ export const ToolPermissionsSchema = z.object({
   allowGrep: z.boolean().default(true),
   allowGlob: z.boolean().default(true),
   allowList: z.boolean().default(true),
+  /** `git`. Read subcommands are harmless; commit/push/reset are not. */
+  allowGit: z.boolean().default(true),
+  /** `web`. Outbound network: a model can encode data into a URL. */
+  allowWeb: z.boolean().default(true),
+  /** `update_plan` / `update_todo`, which write PLAN.md and TODO.md. */
+  allowPlanWrite: z.boolean().default(true),
 });
 
 // ── Provider Schemas ───────────────────────────────────────────

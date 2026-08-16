@@ -8,6 +8,7 @@
 
 import { z } from "zod";
 import { configManager } from "../config/index.js";
+import { ToolPermissionsSchema } from "../config/schema.js";
 import type { ToolPermissions } from "../config/schema.js";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -86,13 +87,31 @@ const TOOL_PERMISSION_MAP: Record<string, keyof ToolPermissions> = {
   glob: "allowGlob",
   list: "allowList",
   skill: "allowFileRead",
+  git: "allowGit",
+  web: "allowWeb",
+  update_plan: "allowPlanWrite",
+  update_todo: "allowPlanWrite",
 };
+
+/** Registered tool ids, for the test that asserts none escapes the map. */
+export { TOOL_PERMISSION_MAP };
+
+/** Schema defaults, resolved once, for keys an older config never wrote. */
+const PERMISSION_DEFAULTS = ToolPermissionsSchema.parse({});
 
 function checkPermission(toolId: string): boolean {
   const config = configManager.getMerged();
   const key = TOOL_PERMISSION_MAP[toolId];
+  // An unmapped tool runs ungated. That is the behaviour, not an accident, but
+  // it is a silent one — `permissions.test.ts` asserts every registered tool is
+  // mapped so a new tool cannot slip through unnoticed.
   if (!key) return true;
-  return config.tools[key];
+
+  const value = config.tools?.[key];
+  // A key the stored config predates is UNKNOWN, not denied. Adding a permission
+  // must never silently switch off a tool that already worked for someone whose
+  // `config.jsonc` was written before the key existed.
+  return typeof value === "boolean" ? value : PERMISSION_DEFAULTS[key];
 }
 
 // ── Truncation ─────────────────────────────────────────────────

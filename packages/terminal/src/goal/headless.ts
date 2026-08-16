@@ -31,6 +31,14 @@ export const MUTATING_TOOLS = new Set(["write", "edit", "bash"]);
 export const READ_ONLY_TOOLS = ["read", "grep", "glob", "list", "git", "web", "skill"];
 
 /**
+ * Tools withheld when nobody is watching even though they do not touch the
+ * filesystem. `web` makes outbound requests, and a model can encode whatever it
+ * just read into a URL — supervised that is a visible action, unsupervised it is
+ * an exfiltration channel nobody sees. Enable it with `inherit` if you want it.
+ */
+export const UNSUPERVISED_DENY = new Set(["web"]);
+
+/**
  * `git` is in the read-only set for `status`/`diff`/`log`, which are genuinely
  * useful context for a goal. But the tool also does `commit`, `push`, `reset`
  * and `checkout`, so tool-level gating alone would let an unattended loop
@@ -50,7 +58,7 @@ export function isCallAllowed(
 ): { allowed: true } | { allowed: false; why: string } {
   if (policy === "inherit") return { allowed: true };
 
-  if (MUTATING_TOOLS.has(name)) {
+  if (MUTATING_TOOLS.has(name) || UNSUPERVISED_DENY.has(name)) {
     return { allowed: false, why: `"${name}" no esta disponible en ejecucion autonoma sin supervision` };
   }
 
@@ -101,7 +109,7 @@ export function allowedToolIds(
   toolIds: string[] = READ_ONLY_TOOLS,
 ): string[] {
   if (policy === "inherit") return toolIds;
-  return toolIds.filter((id) => !MUTATING_TOOLS.has(id));
+  return toolIds.filter((id) => !MUTATING_TOOLS.has(id) && !UNSUPERVISED_DENY.has(id));
 }
 
 /**
