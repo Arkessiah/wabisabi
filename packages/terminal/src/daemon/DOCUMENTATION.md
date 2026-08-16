@@ -120,7 +120,8 @@ arranque desacoplado → el shell padre muere → el daemon sigue vivo y respond
 Se lanza con `process.argv[1]`, así que **cualquier import roto del CLI impide arrancar el daemon**.
 Ya mordió una vez: `rendering/` importaba `beautiful-mermaid` en el nivel superior y tumbaba el
 arranque entero por un renderizador de diagramas que el daemon no usa. Se resolvió haciendo esa
-carga perezosa, no añadiendo un entrypoint aparte.
+carga perezosa; el paquete ya está instalado, pero la carga perezosa **se queda**: el daemon no
+debe depender de que el árbol del CLI esté intacto.
 
 **Regla que se deriva**: cualquier dependencia opcional o decorativa que cuelgue del grafo del CLI
 debe cargarse bajo demanda. Un fallo al importarla no puede costar el proceso de fondo.

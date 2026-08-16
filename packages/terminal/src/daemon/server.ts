@@ -111,10 +111,20 @@ export function startServer(deps: DaemonServerDeps): DaemonServerHandle {
     fetch: handler,
   });
 
-  deps.logger.info(`IPC escuchando en ${LOOPBACK}:${server.port}`);
+  // `Bun.serve().port` is optional in the type because a unix-socket server has
+  // none. We always bind TCP, so an absent port means something is very wrong —
+  // and publishing `undefined` into the lock would advertise a daemon nobody can
+  // reach. Fail here rather than one layer later.
+  const port = server.port;
+  if (typeof port !== "number") {
+    server.stop(true);
+    throw new Error("el servidor de control no expuso un puerto TCP");
+  }
+
+  deps.logger.info(`IPC escuchando en ${LOOPBACK}:${port}`);
 
   return {
-    port: server.port,
+    port,
     hostname: LOOPBACK,
     stop: () => server.stop(true),
   };
