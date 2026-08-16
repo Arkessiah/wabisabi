@@ -8,9 +8,11 @@
 import { describe, expect, test } from "bun:test";
 import {
   allowedToolIds,
+  isCallAllowed,
   runHeadlessTurn,
   toChatMessages,
   MUTATING_TOOLS,
+  READ_ONLY_GIT_SUBCOMMANDS,
   READ_ONLY_TOOLS,
 } from "../headless.js";
 import type { ChatMessage, ChatResponse } from "../../clients/api-client.js";
@@ -20,11 +22,13 @@ import { toolRegistry } from "../../tools/index.js";
 import { readTool } from "../../tools/read.js";
 import { bashTool } from "../../tools/bash.js";
 import { grepTool } from "../../tools/grep.js";
+import { gitTool } from "../../tools/git.js";
 
 // The registry is populated by the CLI entrypoint, which tests do not load.
 toolRegistry.register(readTool);
 toolRegistry.register(bashTool);
 toolRegistry.register(grepTool);
+toolRegistry.register(gitTool);
 
 function session(messages: SessionInfo["messages"] = []): SessionInfo {
   return {
@@ -115,7 +119,7 @@ describe("una tool mutante no llega a ejecutarse en read-only", () => {
 
     const toolReply = client.seen[1]?.messages.find((m) => m.role === "tool");
     expect(toolReply?.content).toContain("no esta disponible");
-    expect(toolReply?.content).toContain("No la reintentes");
+    expect(toolReply?.content).toContain("No lo reintentes");
   });
 
   test("bajo read-only, bash ni siquiera se le ofrece al modelo", async () => {
@@ -133,6 +137,63 @@ describe("una tool mutante no llega a ejecutarse en read-only", () => {
     });
 
     expect(client.seen[0]?.specs.map((s) => s.function.name)).toContain("bash");
+  });
+});
+
+describe("git: la etiqueta read-only tiene que ser cierta", () => {
+  test("los subcomandos que leen pasan", () => {
+    for (const sub of ["status", "diff", "log", "show"]) {
+      expect(isCallAllowed("read-only", "git", { subcommand: sub }).allowed).toBe(true);
+    }
+  });
+
+  test("los que MODIFICAN el repositorio se retienen", () => {
+    // Sin esto, un bucle desatendido podia commitear, pushear y resetear
+    // bajo una politica llamada literalmente "read-only".
+    for (const sub of ["commit", "push", "reset", "checkout", "merge", "cherry-pick", "add", "stash", "tag", "pull"]) {
+      const v = isCallAllowed("read-only", "git", { subcommand: sub });
+      expect(v.allowed).toBe(false);
+      if (!v.allowed) expect(v.why).toContain(sub);
+    }
+  });
+
+  test("es allowlist: un subcomando desconocido se retiene", () => {
+    expect(isCallAllowed("read-only", "git", { subcommand: "inventado" }).allowed).toBe(false);
+    expect(isCallAllowed("read-only", "git", {}).allowed).toBe(false);
+  });
+
+  test("ninguno de los permitidos escribe en el repo", () => {
+    for (const sub of READ_ONLY_GIT_SUBCOMMANDS) {
+      expect(["commit", "push", "reset", "checkout", "merge", "add", "stash", "pull", "tag", "cherry-pick"])
+        .not.toContain(sub);
+    }
+  });
+
+  test("con inherit, git completo (el usuario lo acepto)", () => {
+    expect(isCallAllowed("inherit", "git", { subcommand: "push" }).allowed).toBe(true);
+    expect(isCallAllowed("inherit", "bash", {}).allowed).toBe(true);
+  });
+
+  test("en el turno real, un git commit se retiene y no se ejecuta", async () => {
+    const client = scriptedClient([
+      {
+        content: null,
+        tool_calls: [
+          { id: "c1", type: "function" as const,
+            function: { name: "git", arguments: JSON.stringify({ subcommand: "push" }) } },
+        ],
+      },
+      { content: "no pude pushear" },
+    ]);
+
+    const res = await runHeadlessTurn(client, session(), "sys", "sube los cambios", {
+      toolIds: ["read", "git"],
+    });
+
+    expect(res.withheld).toEqual(["git"]);
+    expect(res.toolCalls).toBe(0);
+    const reply = client.seen[1]?.messages.find((m) => m.role === "tool");
+    expect(reply?.content).toContain("push");
   });
 });
 

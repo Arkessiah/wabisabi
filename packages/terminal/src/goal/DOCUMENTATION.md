@@ -262,12 +262,18 @@ Por eso los turnos headless tienen **política propia**:
 
 | `goal.autonomousTools` | Efecto |
 |---|---|
-| `read-only` (**default**) | `write`, `edit` y `bash` **ni se le ofrecen al modelo** |
+| `read-only` (**default**) | `write`, `edit` y `bash` **ni se le ofrecen al modelo**, y `git` se filtra por subcomando |
 | `inherit` | conjunto completo: el usuario acepta escrituras y shell sin supervisión |
 
 Retirar la tool es más fuerte que rechazarla después: **el modelo no puede pedir lo que no se le
 da**. Si aun así la pide (porque la conoce), se le responde que no está disponible y que **no la
 reintente**, para que informe del bloqueo en vez de gastar iteraciones.
+
+**No basta con filtrar por tool.** `git` es útil en modo lectura (`status`, `diff`, `log`) pero el
+mismo tool hace `commit`, `push`, `reset` y `checkout`: dejarlo entero convertía la política
+llamada literalmente *read-only* en permiso para **reescribir y publicar historia sin supervisión**.
+El filtro es también **por subcomando**, y es una **allowlist**: un subcomando de git que se añada
+mañana queda retenido hasta que alguien decida que es seguro, en vez de heredar permiso en silencio.
 
 Otras protecciones:
 
@@ -323,7 +329,7 @@ Detalles con consecuencias:
 
 ## Validación
 
-`bun test src/goal/` — 173 tests: orden de decisión, abort=pausa, las tres paradas duras, la
+`bun test src/goal/` — 179 tests: orden de decisión, abort=pausa, las tres paradas duras, la
 compactación no juzgada, las rachas de bloqueo y de fallo de auditoría, la contabilidad segmentada
 y monótona, y la higiene del prompt del auditor (escapado XML, recorte por el final, rechazo de
 veredictos inventados). Ninguno necesita modelo ni red.

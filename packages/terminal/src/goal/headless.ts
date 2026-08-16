@@ -30,6 +30,44 @@ export const MUTATING_TOOLS = new Set(["write", "edit", "bash"]);
 /** Tools a headless turn may use when nobody can approve anything. */
 export const READ_ONLY_TOOLS = ["read", "grep", "glob", "list", "git", "web", "skill"];
 
+/**
+ * `git` is in the read-only set for `status`/`diff`/`log`, which are genuinely
+ * useful context for a goal. But the tool also does `commit`, `push`, `reset`
+ * and `checkout`, so tool-level gating alone would let an unattended loop
+ * rewrite and publish history under a policy literally named "read-only".
+ *
+ * Gating therefore happens at the SUBCOMMAND level too. Allowlist, not
+ * blocklist: a git subcommand added later is withheld until someone decides it
+ * is safe, rather than silently inheriting permission.
+ */
+export const READ_ONLY_GIT_SUBCOMMANDS = new Set(["status", "diff", "log", "show", "branch", "remote"]);
+
+/** Whether a specific call is allowed, once the tool itself is. */
+export function isCallAllowed(
+  policy: AutonomousToolPolicy,
+  name: string,
+  args: Record<string, unknown>,
+): { allowed: true } | { allowed: false; why: string } {
+  if (policy === "inherit") return { allowed: true };
+
+  if (MUTATING_TOOLS.has(name)) {
+    return { allowed: false, why: `"${name}" no esta disponible en ejecucion autonoma sin supervision` };
+  }
+
+  if (name === "git") {
+    const sub = typeof args.subcommand === "string" ? args.subcommand : "";
+    if (!READ_ONLY_GIT_SUBCOMMANDS.has(sub)) {
+      return {
+        allowed: false,
+        why: `"git ${sub || "?"}" modifica el repositorio y no esta disponible sin supervision; ` +
+          `solo puedes usar: ${[...READ_ONLY_GIT_SUBCOMMANDS].join(", ")}`,
+      };
+    }
+  }
+
+  return { allowed: true };
+}
+
 export type AutonomousToolPolicy = "read-only" | "inherit";
 
 export interface HeadlessTurnOptions {
@@ -184,26 +222,25 @@ export async function runHeadlessTurn(
     for (const call of calls) {
       const name = call.function?.name ?? "";
 
-      // Withheld rather than executed. The model is told plainly, so it can
-      // report the blocker instead of looping on a tool it will never get.
-      if (policy === "read-only" && MUTATING_TOOLS.has(name)) {
-        withheld.push(name);
-        log(`turno headless: "${name}" retenido por politica read-only`);
-        messages.push({
-          role: "tool",
-          tool_call_id: call.id,
-          content:
-            `La herramienta "${name}" no esta disponible en ejecucion autonoma sin supervision. ` +
-            `No la reintentes: informa de que hace falta y sigue con lo que si puedas hacer.`,
-        });
-        continue;
-      }
-
       let args: Record<string, unknown> = {};
       try {
         args = JSON.parse(call.function?.arguments || "{}");
       } catch {
         // A malformed argument blob is the model's error, not a crash of ours.
+      }
+
+      // Withheld rather than executed. The model is told plainly, so it can
+      // report the blocker instead of looping on something it will never get.
+      const verdict = isCallAllowed(policy, name, args);
+      if (!verdict.allowed) {
+        withheld.push(name);
+        log(`turno headless: ${verdict.why}`);
+        messages.push({
+          role: "tool",
+          tool_call_id: call.id,
+          content: `${verdict.why}. No lo reintentes: informa de que hace falta y sigue con lo demas.`,
+        });
+        continue;
       }
 
       const result = await toolRegistry.execute(name, args, {
