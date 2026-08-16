@@ -94,7 +94,29 @@ const PAGE = (wsPort: number, sessionToken: string) => /* html */ `<!DOCTYPE htm
 
 // ── Helpers ───────────────────────────────────────────────────
 
-function pipeStream(reader: ReadableStreamDefaultReader<Uint8Array>, ws: { send(data: string | BufferSource): void }) {
+/** Lo que necesitamos de un socket: enviar. `ServerWebSocket.send` devuelve el
+ *  numero de bytes escritos, no void, asi que el retorno se deja abierto. */
+type Sendable = { send(data: string | Uint8Array): unknown };
+
+/**
+ * El stdin del hijo como sumidero escribible.
+ *
+ * El proceso se lanza con `stdin: "pipe"`, asi que en runtime SIEMPRE es un
+ * FileSink; el tipo de Bun no lo sabe porque `Subprocess` es generico sobre la
+ * configuracion de stdio y aqui se infiere la union. La comprobacion documenta
+ * esa suposicion en vez de esconderla tras un cast, y si algun dia alguien
+ * cambia el spawn a `stdin: "inherit"` esto devuelve null en lugar de reventar
+ * en cada pulsacion de teclado.
+ */
+function stdinSink(child: { stdin: unknown }): { write(data: string | Uint8Array): unknown } | null {
+  const sink = child.stdin;
+  if (sink && typeof sink === "object" && "write" in sink) {
+    return sink as { write(data: string | Uint8Array): unknown };
+  }
+  return null;
+}
+
+function pipeStream(reader: ReadableStreamDefaultReader<Uint8Array>, ws: Sendable) {
   (async () => {
     try {
       while (true) {
@@ -147,6 +169,9 @@ export async function webMode(opts: CLIOptions, port = 3333): Promise<void> {
     return child;
   }
 
+  /** El proceso hijo que cuelga de cada socket. */
+  type WithChild = { _child?: ReturnType<typeof spawnChild> };
+
   let server: ReturnType<typeof Bun.serve> | null = null;
   let actualPort = port;
 
@@ -177,7 +202,10 @@ export async function webMode(opts: CLIOptions, port = 3333): Promise<void> {
               });
             }
 
-            return srv.upgrade(req)
+            // El segundo argumento es obligatorio en los tipos porque `upgrade` es
+            // generico sobre los datos que se cuelgan del socket; aqui no colgamos
+            // nada en el upgrade (el hijo se asocia en `open`).
+            return srv.upgrade(req, { data: undefined })
               ? (undefined as unknown as Response)
               : new Response("Upgrade failed", {
                   status: 400,
@@ -202,23 +230,25 @@ export async function webMode(opts: CLIOptions, port = 3333): Promise<void> {
         websocket: {
           open(ws) {
             const child = spawnChild();
-            (ws as any)._child = child;
+            (ws as unknown as WithChild)._child = child;
             pipeStream(child.stdout.getReader(), ws);
             pipeStream(child.stderr.getReader(), ws);
             child.exited.then(() => { children.delete(child); try { ws.close(); } catch {} });
           },
           message(ws, msg) {
-            const child = (ws as any)._child as import("bun").Subprocess | undefined;
+            const child = (ws as unknown as WithChild)._child;
             if (!child) return;
+            const sink = stdinSink(child);
+            if (!sink) return;
             if (typeof msg === "string") {
               try { if (JSON.parse(msg).type === "resize") return; } catch {}
-              child.stdin.write(msg);
+              sink.write(msg);
             } else {
-              child.stdin.write(msg as Buffer);
+              sink.write(msg as Uint8Array);
             }
           },
           close(ws) {
-            const child = (ws as any)._child as import("bun").Subprocess | undefined;
+            const child = (ws as unknown as WithChild)._child;
             if (child) { children.delete(child); try { child.kill(); } catch {} }
           },
         },
