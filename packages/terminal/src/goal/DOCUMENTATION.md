@@ -52,6 +52,25 @@ convencerlo por la vía de darle órdenes.
 5. Auditar. `complete` cierra. `blocked` **no cierra a la primera**: hacen falta **3 seguidos**,
    porque un tropiezo puntual no puede matar un objetivo. `continue` sigue.
 
+## El auditor juzga el diff, no solo la prosa
+
+Para un objetivo que escribe, el auditor recibe además **la evidencia dura**: ficheros tocados y
+diff del worktree. Sin eso solo lee el relato del propio agente, y eso falla de una forma concreta
+y medida: en una prueba real el auditor dijo **`continue` doce veces seguidas** sobre un worktree
+en el que no se había escrito ni un byte, porque el agente describía el problema de forma
+convincente turno tras turno.
+
+Verificado con qwen2.5:3b sobre ese mismo turno:
+
+| | Veredicto |
+|---|---|
+| Sin evidencia | `continue` |
+| Con worktree vacío | **`blocked`** |
+| Con el arreglo aplicado | `continue` (reconoce el fichero modificado) |
+
+El bloque **solo aparece si el objetivo puede escribir**: para uno de solo lectura un repositorio
+intacto es lo correcto, y mencionarlo empujaría al auditor a bloquear trabajo válido.
+
 ## El auditor caído no conduce el bucle a ciegas
 
 Si la auditoría falla (modelo inalcanzable, timeout, salida inválida) se tolera **exactamente una**
@@ -353,7 +372,7 @@ Detalles con consecuencias:
 
 ## Validación
 
-`bun test src/goal/` — 194 tests: orden de decisión, abort=pausa, las tres paradas duras, la
+`bun test src/goal/` — 199 tests: orden de decisión, abort=pausa, las tres paradas duras, la
 compactación no juzgada, las rachas de bloqueo y de fallo de auditoría, la contabilidad segmentada
 y monótona, y la higiene del prompt del auditor (escapado XML, recorte por el final, rechazo de
 veredictos inventados). Ninguno necesita modelo ni red.

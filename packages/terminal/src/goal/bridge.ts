@@ -152,7 +152,26 @@ export function createAgentBridge(options: BridgeOptions = {}) {
 
       if (!last) return { ok: false as const, reason: "sin turno que auditar" };
       void facts;
-      return runAudit(cortex, goal.objective, last.content);
+
+      // Un objetivo que escribe deja evidencia dura; la prosa del turno no lo es.
+      // Sin esto, el auditor decia "continue" turno tras turno sobre un worktree
+      // en el que no se habia escrito ni un byte (medido: 12 veces seguidas).
+      let changes: { files: string[]; diff: string } | undefined;
+      if ((options.autonomousTools ?? "read-only") === "inherit" && session) {
+        try {
+          const { worktreeNames, worktreeChanges } = await import("./worktree.js");
+          const { dir } = worktreeNames(goal.sessionId);
+          const { existsSync } = await import("fs");
+          if (existsSync(dir)) {
+            const ch = await worktreeChanges(dir);
+            changes = { files: ch.files, diff: ch.diff };
+          }
+        } catch {
+          // Sin evidencia se audita como antes: peor, pero no peligroso.
+        }
+      }
+
+      return runAudit(cortex, goal.objective, last.content, changes ? { changes } : {});
     },
 
     /**

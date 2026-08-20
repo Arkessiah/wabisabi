@@ -54,6 +54,47 @@ describe("prompt del auditor", () => {
   });
 });
 
+describe("evidencia del repositorio", () => {
+  test("un objetivo de solo lectura NO lleva bloque de cambios", () => {
+    // Mencionar un repo intacto empujaria al auditor a bloquear trabajo valido.
+    expect(buildAuditPrompt("lee y describe", "hecho")).not.toContain("cambios_en_el_repositorio");
+  });
+
+  test("sin ficheros tocados, se dice sin rodeos que no se escribio nada", () => {
+    const p = buildAuditPrompt("arregla el bug", "he analizado el problema a fondo", {
+      files: [],
+      diff: "",
+    });
+
+    expect(p).toContain("NINGUNO");
+    expect(p).toContain("no ha escrito ni un byte");
+    // Y la instruccion que evita las 12 continuaciones sobre un worktree vacio.
+    expect(p).toContain("responde blocked, no continue");
+  });
+
+  test("con cambios, el diff entra como evidencia", () => {
+    const p = buildAuditPrompt("arregla el bug", "hecho", {
+      files: ["M maths.js"],
+      diff: "--- a/maths.js\n+++ b/maths.js\n+  if (!nums.length) return 0;",
+    });
+
+    expect(p).toContain("maths.js");
+    expect(p).toContain("+  if (!nums.length) return 0;");
+    expect(p).toContain("EVIDENCIA");
+  });
+
+  test("un diff enorme se recorta en vez de reventar el contexto del auditor", () => {
+    const p = buildAuditPrompt("x", "y", { files: ["M big"], diff: "z".repeat(10_000) });
+    expect(p).toContain("[...recortado]");
+    expect(p.length).toBeLessThan(6_000);
+  });
+
+  test("la evidencia se declara mas fiable que lo que diga el agente", () => {
+    const p = buildAuditPrompt("x", "y", { files: [], diff: "" });
+    expect(p).toContain("mas fiable que lo que el agente diga de si mismo");
+  });
+});
+
 describe("parseAudit", () => {
   test("acepta los tres veredictos", () => {
     for (const v of ["continue", "complete", "blocked"]) {
