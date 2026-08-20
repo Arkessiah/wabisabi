@@ -151,7 +151,7 @@ export function createScheduler(deps: SchedulerDeps) {
 
   return {
     runOnce,
-    /** Estado actual, para `wabisabi loops`. */
+    /** Estado actual en memoria. Aun no hay comando de usuario que lo muestre. */
     status: (): LoopState[] => [...states.values()],
     /** Id de sesión para una ejecución de loop. */
     newSessionId: (loop: Loop): string =>
