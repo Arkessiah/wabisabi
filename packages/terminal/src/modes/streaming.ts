@@ -6,7 +6,13 @@
  * Usage: echo "read package.json and list deps" | wabisabi stream
  */
 
-import { ApiClient, type CLIOptions, type ChatMessage } from "../clients/api-client.js";
+import {
+  ApiClient,
+  type CLIOptions,
+  type ChatMessage,
+  type StreamDelta,
+  type StreamResult,
+} from "../clients/api-client.js";
 import { toolRegistry, type ToolSpec } from "../tools/index.js";
 import { projectContext } from "../context/index.js";
 
@@ -41,45 +47,53 @@ export async function streamingMode(opts: CLIOptions): Promise<void> {
   while (maxIterations-- > 0) {
     const gen = client.chatWithToolsStream(messages, toolSpecs);
 
-    let content = "";
-    let hasToolCalls = false;
-    const result = await (async () => {
-      for await (const delta of gen) {
-        if (delta.content) {
-          content += delta.content;
-          process.stdout.write(delta.content);
-        }
+    // El valor de RETORNO del generador (el que trae las tool_calls) se entrega
+    // en la llamada a next() que marca done. Un `for await` lo DESCARTA, y llamar
+    // a next() despues sobre un generador agotado devuelve undefined — con lo que
+    // el modo stream nunca ejecutaba ninguna herramienta: rompia el bucle en la
+    // primera vuelta. Hay que consumirlo a mano, como hace base-agent.
+    let result: StreamResult | undefined;
+    while (true) {
+      const { done, value } = await gen.next();
+      if (done) {
+        result = value as StreamResult | undefined;
+        break;
       }
-      // Get the final return value
-      const final = await gen.next();
-      return final.value;
-    })();
-
-    if (!result || result.tool_calls.length === 0) {
-      break;
+      const delta = value as StreamDelta;
+      if (delta?.content) {
+        process.stdout.write(delta.content);
+      }
     }
 
-    // Execute tool calls
-    hasToolCalls = true;
+    const calls = result?.tool_calls ?? [];
+    if (calls.length === 0) break;
+
     messages.push({
       role: "assistant",
-      content: result.content || null,
-      tool_calls: result.tool_calls,
+      content: result?.content || null,
+      tool_calls: calls,
     });
 
-    for (const call of result.tool_calls) {
+    for (const call of calls) {
+      // Una tool call a medio llegar no puede tumbar el modo stream.
+      const name = call.function?.name;
+      if (!name) {
+        process.stderr.write("> tool call incompleta, ignorada\n");
+        continue;
+      }
+
       let args: Record<string, unknown>;
       try {
-        args = JSON.parse(call.function.arguments);
+        args = JSON.parse(call.function?.arguments || "{}");
       } catch {
         args = {};
       }
 
-      const toolResult = await toolRegistry.execute(call.function.name, args, {
+      const toolResult = await toolRegistry.execute(name, args, {
         projectRoot: projectContext.getProjectRoot(),
       });
 
-      process.stderr.write(`> ${call.function.name}: ${toolResult.title}\n`);
+      process.stderr.write(`> ${name}: ${toolResult.title}\n`);
 
       messages.push({
         role: "tool",

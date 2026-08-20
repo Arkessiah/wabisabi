@@ -26,8 +26,15 @@ jobs:
 
       - name: Run linter
         run: |
-          # Add linter when configured
-          echo "Linting passed (placeholder)"
+          # OJO: placeholder. No hay linter configurado todavia, asi que este
+          # paso NO comprueba nada. Verde aqui no significa codigo limpio.
+          echo "Linting passed (placeholder — no linter configured)"
+
+      # Trinquete de tipos: falla si la deuda SUBE. No se exige cero porque el
+      # repo arrastra errores previos, y un CI rojo permanente deja de significar
+      # nada. Asi la deuda solo puede ir a menos. Ver scripts/type-budget.sh.
+      - name: Type check (budget)
+        run: bash scripts/type-budget.sh packages/terminal
 
       - name: Run tests - Terminal
         run: |
