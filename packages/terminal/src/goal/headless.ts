@@ -88,6 +88,12 @@ export interface HeadlessTurnOptions {
   /** Tool ids the agent would normally have. */
   toolIds?: string[];
   maxIterations?: number;
+  /**
+   * Where the tools operate. Defaults to the session's project root; a writing
+   * goal passes its isolated worktree instead, so nothing it does lands in the
+   * user's working tree.
+   */
+  projectRoot?: string;
   log?: (message: string) => void;
   signal?: AbortSignal;
 }
@@ -252,7 +258,7 @@ export async function runHeadlessTurn(
       }
 
       const result = await toolRegistry.execute(name, args, {
-        projectRoot: session.projectRoot,
+        projectRoot: options.projectRoot ?? session.projectRoot,
         sessionId: session.id,
         ...(options.signal ? { abort: options.signal } : {}),
       });

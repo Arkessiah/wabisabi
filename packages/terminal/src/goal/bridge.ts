@@ -230,6 +230,24 @@ export function createAgentBridge(options: BridgeOptions = {}) {
       const merged = configManager.getMerged();
       const client = new ApiClient({ ...merged, model: session.model });
 
+      const policy = options.autonomousTools ?? "read-only";
+
+      // A goal that can write gets an isolated worktree, always. Writing into the
+      // user's working tree would mix an unattended agent's edits with their own
+      // uncommitted work, with no clean way to tell them apart or undo one.
+      let workRoot = session.projectRoot;
+      if (policy === "inherit") {
+        const { ensureWorktree } = await import("./worktree.js");
+        const wt = await ensureWorktree(session.projectRoot, goal.sessionId);
+        if (!wt.ok) {
+          // Refusing is the point: without isolation there is no review and no
+          // undo, so the goal stops instead of writing somewhere unsafe.
+          throw new Error(`no se puede aislar el trabajo del objetivo: ${wt.error}`);
+        }
+        workRoot = wt.path;
+        if (wt.created) log(`worktree creado para ${goal.sessionId}: ${wt.path} (rama ${wt.branch})`);
+      }
+
       // The interactive agent gets the whole project context; a headless turn
       // used to get one sentence, and it showed: the model chatted for turns
       // before touching a tool because nothing told it it had any.
@@ -244,6 +262,9 @@ export function createAgentBridge(options: BridgeOptions = {}) {
 
       const systemPrompt = [
         "Eres un agente de codigo trabajando de forma AUTONOMA hacia un objetivo.",
+        ...(workRoot !== session.projectRoot
+          ? [`Trabajas en una COPIA AISLADA del repositorio: ${workRoot}. Usa siempre esa ruta.`]
+          : []),
         "Nadie puede responderte: no hagas preguntas, no pidas confirmacion.",
         "TIENES herramientas. Usalas para comprobar los hechos en vez de suponerlos:",
         "leer un fichero antes de describirlo no es opcional.",
@@ -259,7 +280,8 @@ export function createAgentBridge(options: BridgeOptions = {}) {
         systemPrompt,
         prompt,
         {
-          policy: options.autonomousTools ?? "read-only",
+          policy,
+          projectRoot: workRoot,
           maxIterations: options.maxTurnIterations,
           log,
         },

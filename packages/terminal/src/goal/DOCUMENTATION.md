@@ -20,6 +20,7 @@ terminal cerrada.
 - `bridge.ts` — ata `readFacts` / `audit` / `dispatch` a la sesión, cortex y el agente.
 - `harvest.ts` — destila un objetivo cumplido en una **propuesta** de skill.
 - `headless.ts` — ejecuta un turno de agente sin nadie mirando.
+- `worktree.ts` — aislamiento en `git worktree` para los objetivos que escriben.
 - `actions.ts` — crear, pausar, reanudar y borrar. Único camino para el REPL y la CLI.
 
 `tick.ts` no hace I/O, no llama al modelo, no toca el reloj. Todo lo sutil de un bucle autónomo
@@ -133,6 +134,29 @@ fallido y se ve en el log.
 El prompt de continuación lleva el objetivo **XML-escapado** y exige cerrar el turno con un parte
 factual de hecho/verificado/pendiente — porque el auditor solo ve ese último turno: ese parte *es*
 su evidencia.
+
+## Aislamiento: un objetivo que escribe no toca tu árbol (`worktree.ts`)
+
+Con `autonomousTools: inherit` el agente edita ficheros sin supervisión. Hacerlo **en el árbol de
+trabajo del usuario** significa despertarse con un repo que otro ha estado editando, **mezclado con
+tu propio trabajo sin commitear**, y sin forma limpia de separar lo uno de lo otro ni deshacer.
+
+Por eso un objetivo que escribe recibe **su propio `git worktree`**: mismo repositorio e historia,
+directorio de trabajo y rama aparte, en `~/.wabisabi/worktrees/<sessionId>` sobre
+`wabisabi/goal-<sessionId>`. El resultado se revisa como **diff** y se tira con un comando.
+**Es la diferencia entre un modo que nadie se atreve a activar y uno que compensa usar.**
+
+- **El aislamiento no es opcional con `inherit`**: se activa solo.
+- **Fuera de un repo git, `inherit` se NIEGA a escribir.** Sin repo no hay revisión ni undo, y un
+  bucle desatendido escribiendo en un directorio sin versionar no es algo que se deba ofrecer.
+- **Se ramifica desde `HEAD`, no del árbol sucio**: el objetivo parte de un estado conocido y **tu
+  trabajo sin commitear ni se ve ni se toca** — no puede dañar lo que no ve.
+- **Idempotente**: el segundo tick reutiliza el worktree, así que el objetivo conserva su progreso
+  entre turnos y entre reinicios del daemon.
+- **`worktreeChanges` incluye ficheros nuevos en el diff.** `git diff HEAD` a secas los oculta, así
+  que un objetivo cuya aportación entera es un fichero nuevo saldría con diff vacío — lo contrario
+  de lo que una revisión necesita.
+- **Borrar sin `force` se niega** si hay cambios: tirar el trabajo de un objetivo debe ser deliberado.
 
 ## Cosecha de skills (`harvest.ts`)
 
@@ -329,7 +353,7 @@ Detalles con consecuencias:
 
 ## Validación
 
-`bun test src/goal/` — 179 tests: orden de decisión, abort=pausa, las tres paradas duras, la
+`bun test src/goal/` — 194 tests: orden de decisión, abort=pausa, las tres paradas duras, la
 compactación no juzgada, las rachas de bloqueo y de fallo de auditoría, la contabilidad segmentada
 y monótona, y la higiene del prompt del auditor (escapado XML, recorte por el final, rechazo de
 veredictos inventados). Ninguno necesita modelo ni red.
