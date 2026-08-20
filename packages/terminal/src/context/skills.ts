@@ -20,6 +20,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+import { parseFrontmatter } from "../utils/frontmatter.js";
 
 /** Max bytes of a SKILL.md we are willing to read at all. */
 const MAX_SKILL_BYTES = 32_000;
@@ -63,38 +64,6 @@ export interface SkillLoadResult {
   meta: SkillMeta;
   content: string;
   truncated: boolean;
-}
-
-/** Minimal frontmatter reader. Only `key: value` pairs; no YAML dependency. */
-function parseFrontmatter(raw: string): {
-  data: Record<string, string>;
-  body: string;
-} | null {
-  if (!raw.startsWith("---")) return null;
-  const end = raw.indexOf("\n---", 3);
-  if (end === -1) return null;
-
-  const header = raw.slice(raw.indexOf("\n") + 1, end);
-  const body = raw.slice(end + 4).replace(/^\r?\n/, "");
-  const data: Record<string, string> = {};
-
-  for (const line of header.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const sep = trimmed.indexOf(":");
-    if (sep === -1) continue;
-    const key = trimmed.slice(0, sep).trim();
-    let value = trimmed.slice(sep + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"') && value.length > 1) ||
-      (value.startsWith("'") && value.endsWith("'") && value.length > 1)
-    ) {
-      value = value.slice(1, -1);
-    }
-    if (key) data[key] = value;
-  }
-
-  return { data, body };
 }
 
 function tokenize(text: string): string[] {

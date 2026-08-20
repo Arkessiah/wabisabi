@@ -148,6 +148,54 @@ export function runDaemon(
         log: (m) => logger.info(m),
       });
       logger.info("bucle de objetivos activo");
+
+      // Tareas programadas: crean sesion + objetivo y ahi acaban. El resto lo hace
+      // el bucle de arriba, asi que una tarea programada hereda la politica
+      // read-only, el aislamiento en worktree, el auditor y los topes.
+      try {
+        const [{ createScheduler }, { createGoal }, { SessionStorage }] = await Promise.all([
+          import("../schedule/runtime.js"),
+          import("../goal/actions.js"),
+          import("../session/storage.js"),
+        ]);
+        const storage = new SessionStorage();
+        const projectRoot = process.cwd();
+
+        const scheduler = createScheduler({
+          projectRoot,
+          store,
+          createSession: async (loop) => {
+            const session = {
+              id: `loop-${loop.name}-${Date.now().toString(36)}`,
+              title: `loop: ${loop.name}`,
+              projectRoot,
+              model: loop.model ?? "llama3.2",
+              agent: loop.agent ?? "build",
+              messages: [],
+              created: Date.now(),
+              updated: Date.now(),
+            };
+            await storage.save(session);
+            return session;
+          },
+          createGoal: (session, loop) => {
+            const res = createGoal(store, {
+              session,
+              objective: loop.prompt,
+              ...(loop.tokenBudget !== undefined ? { tokenBudget: loop.tokenBudget } : {}),
+            });
+            return res.ok ? { ok: true } : { ok: false, error: res.error };
+          },
+          log: (m) => logger.info(m),
+        });
+
+        const schedTimer = setInterval(() => void scheduler.runOnce(), 60_000);
+        schedTimer.unref?.();
+        void scheduler.runOnce();
+        logger.info("planificador de loops activo");
+      } catch (error) {
+        logger.error(`no se pudo arrancar el planificador: ${String(error)}`);
+      }
     } catch (error) {
       logger.error(`no se pudo arrancar el bucle de objetivos: ${String(error)}`);
     }
