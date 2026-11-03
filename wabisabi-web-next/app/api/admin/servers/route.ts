@@ -14,9 +14,13 @@ export async function GET(request: NextRequest) {
 
     let orchestratorNodes = [];
     try {
+      // El orquestador de substratum exige este secreto en todo salvo /health.
+      const secret = process.env.ORCHESTRATOR_SECRET;
       const res = await fetch(`${ORCHESTRATOR_URL}/nodes`, {
+        headers: secret ? { "X-Internal-Secret": secret } : undefined,
         signal: AbortSignal.timeout(5000),
       });
+      if (!res.ok) throw new Error(`orchestrator /nodes ${res.status}`);
       const data = await res.json();
       orchestratorNodes = data.nodes || [];
     } catch (e) {
