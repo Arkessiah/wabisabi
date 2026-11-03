@@ -18,16 +18,63 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// El access token de substratum caduca a los 15 min y cada refresh token vale
+// una sola vez. Por eso todas las peticiones que fallen a la vez comparten un
+// único refresh en vuelo: dos refresh en paralelo quemarían el token y echarían
+// al usuario.
+let refreshInFlight: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = localStorage.getItem("refreshToken");
+  if (!refreshToken) return null;
+  try {
+    // axios "pelado" para que este 401 no vuelva a entrar en el interceptor.
+    const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+    if (!data?.accessToken || !data?.refreshToken) return null;
+    localStorage.setItem("token", data.accessToken);
+    localStorage.setItem("refreshToken", data.refreshToken);
+    return data.accessToken;
+  } catch {
+    return null;
+  }
+}
+
+function endSession() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("refreshToken");
+  window.location.href = "/login";
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("token");
-        window.location.href = "/login";
+  async (error) => {
+    const original = error.config;
+    // Un 401 de estas rutas es "credenciales malas", no "token caducado".
+    const isAuthCall = /^\/auth\/(login|register|refresh|logout)\b/.test(original?.url ?? "");
+    if (
+      error.response?.status !== 401 ||
+      typeof window === "undefined" ||
+      !original ||
+      original._retried ||
+      isAuthCall
+    ) {
+      if (error.response?.status === 401 && typeof window !== "undefined" && !isAuthCall) {
+        endSession();
       }
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    refreshInFlight ??= refreshAccessToken().finally(() => {
+      refreshInFlight = null;
+    });
+    const token = await refreshInFlight;
+    if (!token) {
+      endSession();
+      return Promise.reject(error);
+    }
+    original._retried = true;
+    original.headers.Authorization = `Bearer ${token}`;
+    return api(original);
   },
 );
 
