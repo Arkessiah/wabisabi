@@ -15,8 +15,9 @@ export const SITE_NAME = "Wabi-Sabi";
 
 /** Descripción factual (answer-first) para máquinas: JSON-LD y llms.txt. */
 export const SITE_DESCRIPTION =
-  "Wabi-Sabi is a collaborative AI development platform with a unique economic model.";
+  "Wabi-Sabi is an AI development platform with a token economy and autonomous coding agents for the terminal (CLI) and VS Code.";
 
 /** Autor/creador: proyecto PERSONAL, no una empresa (schema.org Person). */
 export const CREATOR_NAME = "Arkessiah";
 export const CREATOR_URL = "https://github.com/Arkessiah";
+export const REPO_URL = "https://github.com/Arkessiah/wabisabi";

@@ -7,12 +7,13 @@ import {
   SITE_DESCRIPTION,
   CREATOR_NAME,
   CREATOR_URL,
+  REPO_URL,
 } from "@/lib/site";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
-const TITLE = "Wabi-Sabi - AI Development Platform";
+const TITLE = "Wabi-Sabi - AI Coding Agents with a Token Economy";
 const DESCRIPTION = SITE_DESCRIPTION;
 
 export const metadata: Metadata = {
@@ -24,10 +25,12 @@ export const metadata: Metadata = {
   description: DESCRIPTION,
   applicationName: SITE_NAME,
   keywords: [
-    "AI platform",
-    "collaborative AI",
-    "AI development",
+    "AI coding agent",
+    "AI development platform",
     "token economy",
+    "terminal AI assistant",
+    "VS Code AI extension",
+    "local AI models",
   ],
   alternates: { canonical: "/" },
   openGraph: {
@@ -76,6 +79,8 @@ const jsonLd = {
       operatingSystem: "Any",
       url: SITE_URL,
       description: SITE_DESCRIPTION,
+      license: "https://opensource.org/licenses/MIT",
+      sameAs: [REPO_URL],
       author: { "@id": `${SITE_URL}/#person` },
     },
   ],
