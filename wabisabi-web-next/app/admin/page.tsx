@@ -63,7 +63,7 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchDashboardData = async () => {
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     if (!token) {
       router.push("/login");
       return;
@@ -143,7 +143,7 @@ export default function AdminDashboard() {
               </Link>
               <button
                 onClick={() => {
-                  localStorage.removeItem("auth_token");
+                  localStorage.removeItem("token");
                   router.push("/login");
                 }}
                 className="text-slate-600 hover:text-[#1e293b] transition-colors text-sm font-medium"

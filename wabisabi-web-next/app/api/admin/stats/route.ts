@@ -1,30 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyAdminToken } from "@/lib/admin-auth";
 
 const ORCHESTRATOR_URL =
   process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || "http://localhost:8081";
-
-async function verifyAdminToken(
-  request: NextRequest,
-): Promise<{ valid: boolean; userId?: string; role?: string }> {
-  const authHeader = request.headers.get("authorization");
-
-  if (!authHeader?.startsWith("Bearer ")) {
-    return { valid: false };
-  }
-
-  const token = authHeader.split(" ")[1];
-
-  return { valid: true, userId: "demo", role: "admin" };
-}
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await verifyAdminToken(request);
 
-    if (
-      !auth.valid ||
-      !["admin", "superadmin", "root"].includes(auth.role || "")
-    ) {
+    if (!auth.valid) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

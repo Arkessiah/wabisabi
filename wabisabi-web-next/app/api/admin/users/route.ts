@@ -1,27 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-
-async function verifyAdminToken(
-  request: NextRequest,
-): Promise<{ valid: boolean; userId?: string; role?: string }> {
-  const authHeader = request.headers.get("authorization");
-
-  if (!authHeader?.startsWith("Bearer ")) {
-    return { valid: false };
-  }
-
-  const token = authHeader.split(" ")[1];
-
-  return { valid: true, userId: "demo", role: "admin" };
-}
+import { verifyAdminToken, SUPERADMIN_ROLES } from "@/lib/admin-auth";
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await verifyAdminToken(request);
 
-    if (
-      !auth.valid ||
-      !["admin", "superadmin", "root"].includes(auth.role || "")
-    ) {
+    if (!auth.valid) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -156,9 +140,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await verifyAdminToken(request);
+    const auth = await verifyAdminToken(request, SUPERADMIN_ROLES);
 
-    if (!auth.valid || !["superadmin", "root"].includes(auth.role || "")) {
+    if (!auth.valid) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
