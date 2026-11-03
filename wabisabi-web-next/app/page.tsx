@@ -29,6 +29,7 @@ import {
   Check,
 } from "lucide-react";
 import { FriendlyBot } from "@/components/ui/logo";
+import { FaqSection } from "@/components/faq";
 
 const features = [
   {
@@ -963,6 +964,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <FaqSection />
 
       {/* CTA Section */}
       <section className="py-32 bg-[#f8fafc]">
